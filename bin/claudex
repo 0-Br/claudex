@@ -68,17 +68,25 @@ recorded_pid() {
 }
 
 
+# 不健康时把原因写进 HEALTHCHECK_ERROR、不写终端：启动轮询期间的连接失败是常态，
+# 由调用方在最终判定不健康时报出最后一次的原因
 healthcheck() {
-  local key
+  local key=
 
+  HEALTHCHECK_ERROR="client key $CLIENT_KEY_FILE is missing or empty"
   [[ -r $CLIENT_KEY_FILE ]] || return 1
   IFS= read -r key < "$CLIENT_KEY_FILE" || [[ -n $key ]] || return 1
   [[ -n $key ]] || return 1
   # 请求头经 curl 的 stdin 配置传入：命令参数在 /proc/<pid>/cmdline 与 ps 里对同机任意进程可见，
   # 放进 --header 等于把 client key 摊在进程列表上。本机网关不走环境变量里的代理
-  printf 'header = "Authorization: Bearer %s"\n' "$key" |
-    curl --config - --silent --show-error --fail --max-time 2 --noproxy '*' \
-      "http://127.0.0.1:$GATEWAY_PORT/v1/models" >/dev/null
+  if HEALTHCHECK_ERROR=$(
+    printf 'header = "Authorization: Bearer %s"\n' "$key" |
+      curl --config - --silent --show-error --fail --max-time 2 --noproxy '*' \
+        "http://127.0.0.1:$GATEWAY_PORT/v1/models" 2>&1 >/dev/null
+  ); then
+    return 0
+  fi
+  return 1
 }
 
 
@@ -100,7 +108,8 @@ ensure_gateway() (
     if healthcheck; then
       return 0
     fi
-    printf 'claudex: gateway PID %s is running but not healthy; see %s\n' "$pid" "$BOOT_LOG" >&2
+    printf 'claudex: gateway PID %s is running but not healthy (%s); see %s\n' \
+      "$pid" "$HEALTHCHECK_ERROR" "$BOOT_LOG" >&2
     return 1
   fi
   if [[ ! -x $GATEWAY_BIN ]]; then
@@ -130,7 +139,8 @@ ensure_gateway() (
       sleep "$HEALTHCHECK_INTERVAL"
     fi
   done
-  printf 'claudex: gateway failed to become healthy; see %s\n' "$BOOT_LOG" >&2
+  printf 'claudex: gateway failed to become healthy (%s); see %s\n' \
+    "$HEALTHCHECK_ERROR" "$BOOT_LOG" >&2
   if pid_matches "$started_pid"; then
     kill -TERM "$started_pid"
   fi

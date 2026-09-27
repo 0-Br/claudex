@@ -267,7 +267,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 
 ### 10.3 网关的启停与升级
 
-- `gateway start` 幂等：先生成配置，网关已在跑且健康就直接返回 0。拉起时以 `-config <state>/gateway.yaml` 启动，并设 `WRITABLE_PATH=<state 目录>`，网关日志因此落在 state 目录的 `logs/`。健康检查不过时，结束拉起的进程并非零退出。
+- `gateway start` 幂等：先生成配置，网关已在跑且健康就直接返回 0。拉起时以 `-config <state>/gateway.yaml` 启动，并设 `WRITABLE_PATH=<state 目录>`，网关日志因此落在 state 目录的 `logs/`。等待网关就绪期间的连接失败不输出；健康检查最终不过时，报出最后一次失败的原因，结束拉起的进程并非零退出。
 - `gateway stop` 按 PID 与进程身份核对后停止网关。
 - `gateway restart` 与 `upgrade` 走同一套受管流程：由脱离当前会话的 worker 执行，核对旧服务身份，停旧，切换版本（仅升级时），起新，核对新服务；任一步失败，回退到旧二进制与旧服务。升级下载官方发布包，并按官方 `checksums.txt` 校验。
 - `upgrade` 要求网关已安装且正在运行，否则报错。

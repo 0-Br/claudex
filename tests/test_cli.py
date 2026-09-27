@@ -796,7 +796,9 @@ def test_launcher_fast_is_generated_and_not_inherited(netns: Namespace) -> None:
 
 
 def test_gateway_start_is_idempotent_and_stop_stops(netns: Namespace) -> None:
-    assert netns.run("gateway", "start").returncode == 0
+    started = netns.run("gateway", "start")
+    assert started.returncode == 0
+    assert "curl:" not in started.stderr
     pid = _gateway_pid()
     assert _mode(paths.gateway_pid_file()) == 0o600
     assert netns.run("gateway", "start").returncode == 0
@@ -825,6 +827,9 @@ def test_gateway_start_fails_when_gateway_never_healthy(netns: Namespace) -> Non
     result = netns.run("gateway", "start", env={"FAKE_GATEWAY_UNHEALTHY": "1"})
     assert result.returncode != 0
     assert "failed to become healthy" in result.stderr
+    # 轮询期间的 curl 报错不写终端，只在最终失败时随原因报一次
+    assert result.stderr.count("curl:") == 1
+    assert "503" in result.stderr
     pid = _gateway_pid()
     deadline = time.monotonic() + STOP_WAIT_SECONDS
     while Path(f"/proc/{pid}").exists() and time.monotonic() < deadline:
