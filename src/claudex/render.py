@@ -380,7 +380,8 @@ def strip_generated_keys(
     `permissions`、`hooks` 等其余键原样保留；`statusLine.command` 与基底 env 里的
     `ANTHROPIC_DEFAULT_*`、`CLAUDEX_*`、`ANTHROPIC_BASE_URL`、
     `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 去掉，`ANTHROPIC_CUSTOM_HEADERS` 里只去掉
-    Fast 档头。
+    Fast 档头。`statusLine.command` 不计入被去掉的键名：它的原值作为底层渲染器
+    记进 `CLAUDEX_STATUSLINE_COMMAND`，没有丢失。
 
     异常
     ----------
@@ -415,8 +416,6 @@ def strip_generated_keys(
             raise ConfigError(
                 f"settings.base.json 的 statusLine 必须是对象，收到 {status_line!r}"
             )
-        if "command" in status_line:
-            removed.append("statusLine.command")
         cleaned["statusLine"] = {
             key: value for key, value in status_line.items() if key != "command"
         }

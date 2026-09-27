@@ -850,7 +850,7 @@ def test_preflight_reports_generated_base_keys(fake_gateway: _Gateway) -> None:
     report = render.preflight(_config(), profile="daily", check_gateway=True)
     messages = " ".join(item.message for item in report.warnings)
     assert "env.CLAUDEX_FAST" in messages
-    assert "statusLine.command" in messages
+    assert "statusLine" not in messages
 
 
 def test_preflight_gateway_model_missing(fake_gateway: _Gateway) -> None:
