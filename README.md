@@ -314,6 +314,9 @@ OAuth 目录、网关二进制与版本目录的位置固定，不受覆盖变�
 
 - key 只从文件读，不进命令行参数、日志、错误信息、快照与状态文件。
 - `~/.local/state/claudex/gateway.yaml` 与 `~/.config/claudex/keys/`、`client.key`、`management.key` 含凭据，查看时只按键查询，不整文件输出；备份时排除它们，或以加密形式备份。`gateway.yaml` 可以随时由 claudex 重新生成，不必备份。
+- `~/.local/share/claudex/auth/` 是网关的 OAuth 凭据，同样排除或加密备份；丢失后重新 `claudex login` 即可。
+- `~/.local/state/claudex/logs/` 整个目录排除在备份之外：网关日志带 API key 的掩码片段与账户标签，失败快照含完整的请求内容。
+- `claudex.toml`、`gateway.base.yaml` 与 `settings.base.json` 不含凭据，可以照常备份。
 - 网关只监听 `127.0.0.1`；本机对网关的请求不走环境代理。
 
 ## 14. 开发

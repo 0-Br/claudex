@@ -14,6 +14,7 @@ claudex 当前状态的快照与展望。
 | 问题 | 影响 | 优先级 |
 | --- | --- | --- |
 | OpenAI 兼容段（`openrouter`、`openai` 类来源）无法让网关剥掉档位，无档位模型仍会收到 low、medium、high | 不接受 `reasoning_effort` 的上游可能拒收请求；可用 `claudex probe` 发现，README 第 5.3 节已说明 | 低 |
+| 不带版本的 `claudex upgrade` 升到上游最新版，不区分大版本；`status` 在记到新版时的 `note:` 行建议的也是这条命令。CLIProxyAPI v8 以配置层迁移为主，claudex 的配置生成、就地覆写与热加载前提按 v7.3.20 源码核实 | 照 `note:` 行升级会跨到 v8，网关可能改写或不接受生成的配置；受管升级只在新网关不健康时回退，健康但行为改变的情形拦不住。升级时显式写版本号（`claudex upgrade 7.3.20`） | 中 |
 
 ## 路线图
 
