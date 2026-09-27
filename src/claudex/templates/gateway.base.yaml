@@ -1,0 +1,17 @@
+# CLIProxyAPI 的非来源配置。claudex 以本文件为底稿生成 gateway.yaml：
+# host、port、auth-dir、api-keys、remote-management.secret-key 与来源段由 claudex 写入，
+# 这里写了会报配置错误。
+
+# 不向发往上游的对话请求注入生图工具
+disable-image-generation: "chat"
+
+# 出站代理，不需要时留空
+proxy-url: ""
+
+routing:
+  strategy: fill-first
+
+logging-to-file: true
+logs-max-total-size-mb: 10
+error-logs-max-files: 8
+request-log: false

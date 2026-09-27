@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+# claudex：经本机 CLIProxyAPI 网关，用 claudex.toml 里的 profile 启动 Claude Code。
+#
+# 用法：
+#   claudex [@PROFILE|--profile NAME] [--fable|--opus|--sonnet|--haiku REF]… [--with-mcp] [--fast] [claude 参数…]
+#   claudex gateway start|stop|restart
+#   claudex init | key set | probe | login | profiles | status | preflight | update | upgrade | completion
+#
+# 会话启动与用到网关的入口都按同一次序：生成 gateway.yaml；确保网关在跑；这次改写了配置且网关原本
+# 就在跑时等新模型注册；最后（仅启动会话）渲染快照并 exec claude。
+set -euo pipefail
+
+# SELF_DIR 是本脚本所在环境的根目录（经 symlink 调用时解析到实体）。Python 部分用同一环境的解释器：
+# 装成工具环境时是 SELF_DIR/bin/python，从源码树直接运行时是项目环境 SELF_DIR/.venv/bin/python。
+SELF_DIR=$(cd "$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")/.." && pwd)
+if [[ -x $SELF_DIR/bin/python ]]; then
+  PYTHON_BIN=$SELF_DIR/bin/python
+elif [[ -x $SELF_DIR/.venv/bin/python ]]; then
+  PYTHON_BIN=$SELF_DIR/.venv/bin/python
+else
+  PYTHON_BIN=
+fi
+CONFIG_DIR=${CLAUDEX_CONFIG_DIR:-$HOME/.config/claudex}
+STATE_DIR=${CLAUDEX_STATE_DIR:-$HOME/.local/state/claudex}
+GATEWAY_BIN=$HOME/.local/bin/cli-proxy-api
+GATEWAY_CONFIG=$STATE_DIR/gateway.yaml
+CLIENT_KEY_FILE=$CONFIG_DIR/client.key
+PID_FILE=$STATE_DIR/gateway.pid
+START_LOCK=$STATE_DIR/gateway-start.lock
+BOOT_LOG=$STATE_DIR/gateway-bootstrap.log
+GATEWAY_PORT=8317
+HEALTHCHECK_ATTEMPTS=40
+HEALTHCHECK_INTERVAL=0.25
+STOP_ATTEMPTS=20
+STOP_INTERVAL=0.25
+
+
+run_python() {
+  "$PYTHON_BIN" -P -m claudex.cli "$@"
+}
+
+
+# PID 文件里的进程是不是本机这份网关：可执行文件与 GATEWAY_BIN 解析到同一处，且命令行带本配置文件
+pid_matches() {
+  local pid=${1:-}
+  local actual expected
+
+  [[ $pid =~ ^[0-9]+$ ]] || return 1
+  [[ -r /proc/$pid/exe ]] || return 1
+  actual=$(readlink -f -- "/proc/$pid/exe") || return 1
+  expected=$(readlink -f -- "$GATEWAY_BIN") || return 1
+  [[ $actual == "$expected" ]] || return 1
+  tr '\0' '\n' < "/proc/$pid/cmdline" | grep -Fx -- "$GATEWAY_CONFIG" >/dev/null
+}
+
+
+port_in_use() {
+  ss -H -ltn "sport = :$GATEWAY_PORT" | grep -q .
+}
+
+
+recorded_pid() {
+  local pid=
+  if [[ -r $PID_FILE ]]; then
+    IFS= read -r pid < "$PID_FILE" || pid=
+  fi
+  printf '%s' "$pid"
+}
+
+
+healthcheck() {
+  local key
+
+  [[ -r $CLIENT_KEY_FILE ]] || return 1
+  IFS= read -r key < "$CLIENT_KEY_FILE" || [[ -n $key ]] || return 1
+  [[ -n $key ]] || return 1
+  # 请求头经 curl 的 stdin 配置传入：命令参数在 /proc/<pid>/cmdline 与 ps 里对同机任意进程可见，
+  # 放进 --header 等于把 client key 摊在进程列表上。本机网关不走环境变量里的代理
+  printf 'header = "Authorization: Bearer %s"\n' "$key" |
+    curl --config - --silent --show-error --fail --max-time 2 --noproxy '*' \
+      "http://127.0.0.1:$GATEWAY_PORT/v1/models" >/dev/null
+}
+
+
+# 已在跑且健康返回 0；没在跑就拉起并等到健康。不健康或拉不起来时非零退出（受管升级的 worker 依赖这一点）。
+ensure_gateway() (
+  local attempt started_pid pid
+
+  # 网关进程与它写出的日志、失败快照由此继承私有权限；只作用于本子 shell
+  umask 077
+  mkdir -p "$STATE_DIR"
+  : >> "$BOOT_LOG"
+  : >> "$START_LOCK"
+  chmod 0600 "$BOOT_LOG" "$START_LOCK"
+  exec 9> "$START_LOCK"
+  flock 9
+
+  pid=$(recorded_pid)
+  if pid_matches "$pid"; then
+    if healthcheck; then
+      return 0
+    fi
+    printf 'claudex: gateway PID %s is running but not healthy; see %s\n' "$pid" "$BOOT_LOG" >&2
+    return 1
+  fi
+  if [[ ! -x $GATEWAY_BIN ]]; then
+    printf 'claudex: gateway binary not found at %s; see the README for installation\n' "$GATEWAY_BIN" >&2
+    return 1
+  fi
+  if port_in_use; then
+    printf 'claudex: port %s is occupied by an unrecognized process\n' "$GATEWAY_PORT" >&2
+    return 1
+  fi
+
+  (
+    cd "$STATE_DIR"
+    WRITABLE_PATH=$STATE_DIR nohup "$GATEWAY_BIN" -config "$GATEWAY_CONFIG" \
+      >> "$BOOT_LOG" 2>&1 9>&- &
+    printf '%s\n' "$!" > "$PID_FILE.new"
+    chmod 0600 "$PID_FILE.new"
+    mv "$PID_FILE.new" "$PID_FILE"
+  )
+  started_pid=$(recorded_pid)
+
+  for ((attempt = 1; attempt <= HEALTHCHECK_ATTEMPTS; attempt++)); do
+    if healthcheck; then
+      return 0
+    fi
+    if ((attempt < HEALTHCHECK_ATTEMPTS)); then
+      sleep "$HEALTHCHECK_INTERVAL"
+    fi
+  done
+  printf 'claudex: gateway failed to become healthy; see %s\n' "$BOOT_LOG" >&2
+  if pid_matches "$started_pid"; then
+    kill -TERM "$started_pid"
+  fi
+  return 1
+)
+
+
+gateway_running() {
+  pid_matches "$(recorded_pid)"
+}
+
+
+stop_gateway() {
+  local attempt pid
+
+  pid=$(recorded_pid)
+  if ! pid_matches "$pid"; then
+    if [[ -n $pid ]]; then
+      printf 'claudex: stale gateway PID file: %s\n' "$PID_FILE" >&2
+      return 1
+    fi
+    printf 'claudex: gateway is not running\n' >&2
+    return 0
+  fi
+  if ! kill -TERM "$pid"; then
+    if ! pid_matches "$pid"; then
+      rm -f -- "$PID_FILE"
+      return 0
+    fi
+    printf 'claudex: failed to signal gateway PID %s\n' "$pid" >&2
+    return 1
+  fi
+  for ((attempt = 1; attempt <= STOP_ATTEMPTS; attempt++)); do
+    if ! pid_matches "$pid"; then
+      rm -f -- "$PID_FILE"
+      return 0
+    fi
+    if ((attempt < STOP_ATTEMPTS)); then
+      sleep "$STOP_INTERVAL"
+    fi
+  done
+  printf 'claudex: gateway PID %s did not stop after 5 seconds\n' "$pid" >&2
+  return 1
+}
+
+
+# 生成 gateway.yaml → 确保网关在跑 → 配置有改写且网关原本就在跑时等模型注册
+prepare_gateway() {
+  local change was_running=0
+
+  change=$(run_python _gateway-config) || return 1
+  if gateway_running; then
+    was_running=1
+  fi
+  ensure_gateway || return 1
+  if [[ $change == changed ]] && ((was_running)); then
+    run_python _wait-models || return 1
+  fi
+}
+
+
+# 从继承的环境里去掉 Fast 状态：Fast 请求头与 CLAUDEX_FAST 由派生 settings 的 env 给出，
+# 从 --fast 会话里再起的会话不得沿用。只剥 X-Claudex-Tier 这一行（头名不分大小写、允许前导空白），
+# 其余自定义头原样保留，剥完为空就整个 unset
+clear_inherited_fast() {
+  unset CLAUDEX_FAST
+  local headers=${ANTHROPIC_CUSTOM_HEADERS-}
+  [[ -n ${ANTHROPIC_CUSTOM_HEADERS+set} ]] || return 0
+  local kept='' line probe
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%$'\r'}
+    probe=${line#"${line%%[![:space:]]*}"}
+    [[ ${probe,,} == 'x-claudex-tier:'* || -z $line ]] && continue
+    kept+=${kept:+$'\n'}$line
+  done <<< "$headers"
+  if [[ -n $kept ]]; then
+    export ANTHROPIC_CUSTOM_HEADERS=$kept
+  else
+    unset ANTHROPIC_CUSTOM_HEADERS
+  fi
+}
+
+
+launch_session() {
+  local profile=$1 with_mcp=$2 fast=$3
+  shift 3
+  local render_args=() tier_args=()
+  local settings='' notice='' line claude_bin
+  local deny=()
+
+  # 其余参数的前半段是档位替换，以 -- 与透传给 claude 的参数分开
+  while (($# > 0)); do
+    if [[ $1 == -- ]]; then
+      shift
+      break
+    fi
+    tier_args+=("$1")
+    shift
+  done
+  [[ -n $profile ]] && render_args+=(--profile "$profile")
+  ((fast)) && render_args+=(--fast)
+
+  claude_bin=$(command -v claude) || {
+    printf 'claudex: claude is not on PATH\n' >&2
+    return 1
+  }
+  clear_inherited_fast
+  prepare_gateway || return 1
+  local output
+  output=$(run_python _render "${render_args[@]}" "${tier_args[@]}") || return 1
+  while IFS= read -r line; do
+    case $line in
+      settings=*) settings=${line#settings=} ;;
+      mcp_deny=*) deny+=("${line#mcp_deny=}") ;;
+      notice=*) notice=${line#notice=} ;;
+    esac
+  done <<< "$output"
+  if [[ -z $settings || ! -r $settings ]]; then
+    printf 'claudex: rendering produced no settings file\n' >&2
+    return 1
+  fi
+  if [[ -n $notice ]]; then
+    printf '%s\n' "$notice" >&2 || true
+  fi
+  if ((with_mcp)) || ((${#deny[@]} == 0)); then
+    exec "$claude_bin" --settings "$settings" "$@"
+  fi
+  exec "$claude_bin" --settings "$settings" --disallowed-tools "${deny[*]}" "$@"
+}
+
+
+main() {
+  local profile='' with_mcp=0 fast=0
+  local tier_args=()
+
+  case ${1:-} in
+    @)
+      printf 'claudex: @profile needs a non-empty name\n' >&2
+      return 2
+      ;;
+    @*)
+      profile=${1#@}
+      shift
+      ;;
+    gateway)
+      shift
+      case ${1:-} in
+        start)
+          (($# == 1)) || { printf 'claudex: gateway start accepts no arguments\n' >&2; return 2; }
+          prepare_gateway
+          return
+          ;;
+        stop)
+          (($# == 1)) || { printf 'claudex: gateway stop accepts no arguments\n' >&2; return 2; }
+          stop_gateway
+          return
+          ;;
+        restart)
+          shift
+          run_python _gateway-config >/dev/null || return 1
+          exec "$PYTHON_BIN" -P -m claudex.cli gateway restart "$@"
+          ;;
+        *)
+          printf 'claudex: usage: claudex gateway start|stop|restart\n' >&2
+          return 2
+          ;;
+      esac
+      ;;
+    upgrade)
+      shift
+      if [[ ${1:-} != --wait ]]; then
+        run_python _gateway-config >/dev/null || return 1
+      fi
+      exec "$PYTHON_BIN" -P -m claudex.cli upgrade "$@"
+      ;;
+    probe)
+      shift
+      # 探测指定模型要经网关，先按同一次序准备网关；只列上游模型时不需要
+      if (($# >= 2)); then
+        prepare_gateway || return 1
+      fi
+      exec "$PYTHON_BIN" -P -m claudex.cli probe "$@"
+      ;;
+    init|key|login|profiles|status|preflight|update|completion|_*)
+      exec "$PYTHON_BIN" -P -m claudex.cli "$@"
+      ;;
+  esac
+
+  # 前导选项：`--` 之后及未识别参数原样透传给 claude
+  while (($# > 0)); do
+    case $1 in
+      --profile)
+        [[ $# -ge 2 ]] || { printf 'claudex: --profile needs a name\n' >&2; return 2; }
+        profile=$2
+        shift 2
+        ;;
+      --profile=*)
+        profile=${1#--profile=}
+        shift
+        ;;
+      --fable|--opus|--sonnet|--haiku)
+        [[ $# -ge 2 ]] || { printf 'claudex: %s needs a model reference\n' "$1" >&2; return 2; }
+        tier_args+=("$1" "$2")
+        shift 2
+        ;;
+      --with-mcp)
+        with_mcp=1
+        shift
+        ;;
+      --fast)
+        fast=1
+        shift
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+  launch_session "$profile" "$with_mcp" "$fast" "${tier_args[@]}" -- "$@"
+}
+
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  if [[ -z $PYTHON_BIN ]]; then
+    printf 'claudex: no executable Python at %s/bin/python or %s/.venv/bin/python\n' \
+      "$SELF_DIR" "$SELF_DIR" >&2
+    exit 1
+  fi
+  main "$@"
+fi

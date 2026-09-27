@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# claudex-client-key：把网关 client key 输出到 stdout，供 Claude Code 的 apiKeyHelper 与其他工具调用。
+# key 文件缺失、权限不是 0600 或内容不是 64 位小写十六进制时非零退出，stdout 为空，stderr 写原因；
+# 文件末尾有无换行都能读。
+set -euo pipefail
+
+key_file=${CLAUDEX_CONFIG_DIR:-$HOME/.config/claudex}/client.key
+
+if [[ ! -f $key_file ]]; then
+  printf 'claudex: missing client key: %s\n' "$key_file" >&2
+  exit 1
+fi
+if [[ $(stat -c '%a' "$key_file") != 600 ]]; then
+  printf 'claudex: client key must have mode 600: %s\n' "$key_file" >&2
+  exit 1
+fi
+
+key=
+# 末行没有换行时 read 读到内容但返回非零；读空由下面的格式检查报出
+IFS= read -r key < "$key_file" || true
+if [[ ! $key =~ ^[0-9a-f]{64}$ ]]; then
+  printf 'claudex: client key must be 64 lowercase hex characters: %s\n' "$key_file" >&2
+  exit 1
+fi
+printf '%s\n' "$key"

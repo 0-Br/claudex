@@ -1,0 +1,13 @@
+# 就地虚拟环境（uv 创建）
+.venv/
+
+# 打包产物
+build/
+dist/
+*.egg-info/
+
+# Python 与工具缓存
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

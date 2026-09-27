@@ -1,0 +1,84 @@
+[project]
+name = "claudex"
+dynamic = ["version"]
+description = "以专用 settings 启动 Claude Code，把模型请求经本机 CLIProxyAPI 网关转到按 profile 选定的后端"
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML==6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "basedpyright",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/claudex/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claudex"]
+
+# 两个 bash 命令原样装进环境的 bin/：启动器按自身解析后的位置找到同一环境的
+# python，key 读取命令供 Claude Code 的 apiKeyHelper 与其他工具调用。
+[tool.hatch.build.targets.wheel.shared-scripts]
+"bin/claudex" = "claudex"
+"bin/claudex-client-key" = "claudex-client-key"
+
+# ruff 的全部规则写在本段，不继承仓库外的配置；它也是配置发现的停点与第一方 import
+# 判定的锚，ruff 就近找到本段即停。
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+# 排除规则对命令行显式点名的文件同样生效（不设则点名可穿透 exclude）
+force-exclude = true
+
+[tool.ruff.format]
+quote-style = "double"
+# format 范围限 .py：ruff 会改写 md 内代码块，README 与文档不入 format
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+    "C4",   # flake8-comprehensions
+    "PIE",  # misc improvements
+    "PERF", # perflint
+    "TC",   # flake8-type-checking
+    "ERA",  # eradicate
+    "PT",   # flake8-pytest-style
+]
+ignore = [
+    "RUF001", # 中文字符不是歧义 Unicode
+    "RUF002", # 中文 docstring
+    "RUF003", # 中文注释
+    "E741",   # 单字母变量名
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["claudex"]
+
+# 类型检查：standard 档，源码包与测试都在检查面内；存量诊断记在基线文件里，
+# 相对基线不新增 error。解释器不写，取项目环境 .venv。
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["src", "tests"]
+baselineFile = ".basedpyright/baseline.json"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
