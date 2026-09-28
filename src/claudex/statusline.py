@@ -292,11 +292,13 @@ def update_cost_state(
 
     说明
     ----------
-    一次响应完成的信号：原生 `cost.total_cost_usd` 增加；没有原生费用字段时，
-    `total_api_duration_ms` 变了且本次 usage 的指纹与上一次不同。同一次响应在后续
-    刷新里重复出现时指纹不变，不会重复结算；API 失败只增加时长、不带新 usage，也不
-    结算。`/clear` 的判定：原生费用变小，或没有原生费用时 API 时长与上下文 token 同时
-    变小，此时从空状态重新开始，不补算当次。
+    结算条件是本次 usage 的指纹与上一次不同，且有一次响应完成：原生
+    `cost.total_cost_usd` 增加，或没有原生费用字段时 `total_api_duration_ms` 变了。
+    同一次响应在后续刷新里重复出现时指纹不变，不会重复结算；原生费用是会话级累计，
+    subagent 与后台调用也会推高它，但它们不改变主对话的 usage，因此不触发结算，它们
+    的用量也不计入；API 失败只增加时长、不带新 usage，也不结算。`/clear` 的判定：
+    原生费用变小，或没有原生费用时 API 时长与上下文 token 同时变小，此时从空状态重新
+    开始，不补算当次。
     """
     cost_raw = payload.get("cost")
     cost = cost_raw if isinstance(cost_raw, dict) else {}
@@ -330,13 +332,9 @@ def update_cost_state(
         return
 
     native_increased = native_cost is not None and native_cost > previous_native + 1e-9
-    fallback_completed = (
-        api_ms > 0
-        and api_ms != previous_api
-        and event is not None
-        and fingerprint != previous_fingerprint
-    )
-    if event is not None and (native_increased or fallback_completed):
+    fallback_completed = api_ms > 0 and api_ms != previous_api
+    new_usage = event is not None and fingerprint != previous_fingerprint
+    if event is not None and new_usage and (native_increased or fallback_completed):
         _settle(state, profile, event[0], event[1])
     state["api_ms"] = api_ms
     if native_cost is not None:

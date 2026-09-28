@@ -219,6 +219,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 
 - 每个模型的费用，按它的 `openrouter` slug 在 OpenRouter 目录里的单价计算，缓存读写按目录里的缓存单价计入。来源类型不是 `openrouter` 的，显示的是按 OpenRouter 标价折算的等价花费，前面标 ≈。没有 slug 或目录里没有价格的，不显示费用。
 - OpenRouter 目录只有一份缓存，后台每 24 小时刷新一次；`claudex update` 强制刷新，缓存损坏时也用它修复。
+- 状态栏只结算主对话的每次响应：subagent 与后台调用的用量不计入，显示的费用是会话花费的下限。
 - 额度只有三种：Codex 与 Antigravity 的额度窗口与冷却，经网关管理接口取得；`openrouter` 类来源的账户余额，取 `GET /api/v1/credits` 的 `total_credits − total_usage`。某个来源失败时保留上一次成功的数据。
 - 平时没有「过期」类提醒。只有真问题才报：profile 引用的模型不在网关里、订阅模型不在网关定义里、slug 不在目录里、配置错误。
 

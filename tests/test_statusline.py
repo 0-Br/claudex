@@ -318,6 +318,15 @@ def test_native_cost_increase_settles_once() -> None:
     assert state["settled_events"] == 1
 
 
+def test_native_cost_increase_without_new_usage_does_not_resettle() -> None:
+    # subagent 与后台调用推高会话级原生费用，主对话最近一次 usage 不变
+    state = statusline.empty_state()
+    usage = _usage(1000, 200, read=5000, write=400)
+    for native_cost in (0.5, 0.7, 0.9):
+        _prepare(_payload(api_ms=100, native_cost=native_cost, usage=usage), state)
+    assert state["settled_events"] == 1
+
+
 def test_second_response_accumulates() -> None:
     state = statusline.empty_state()
     _prepare(_payload(api_ms=100, native_cost=0.5, usage=_usage(1000, 0)), state)
