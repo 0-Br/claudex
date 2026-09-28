@@ -29,7 +29,8 @@ def test_examples_dir_holds_only_starter_files() -> None:
 def test_claudex_toml_template_parses() -> None:
     parsed = config.parse_config(tomllib.loads(_template_text("claudex.toml")))
     assert parsed.default_profile in parsed.profiles
-    assert parsed.mcp_deny == ("mcp__github__*",)
+    # 起步配置缺省不屏蔽任何 MCP，示例写成注释
+    assert parsed.mcp_deny == ()
 
 
 def test_gateway_base_template_passes_forbidden_key_check(tmp_path: Path) -> None:

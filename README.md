@@ -62,12 +62,15 @@ claudex init
 
 `init` 建配置目录 `~/.config/claudex/` 与其中的 `keys/`（0700），生成两枚随机 key：网关的下游 key `client.key` 与管理接口密码 `management.key`，都是 0600、64 位小写十六进制。随后写三份起步文件：`claudex.toml`、`gateway.base.yaml`、`settings.base.json`。已存在的文件不覆盖，逐个说明跳过。仓库 `examples/` 下是同样的三份起步文件。
 
-接着按第 5 节写来源与 profile，按第 6 节登录订阅、录入 key，然后：
+接着按第 5 节写来源与 profile，按第 6 节录入 key、登录订阅，然后：
 
 ```bash
+claudex gateway start  # 拉起网关；之后启动会话时会自动拉起，这里是为了先做一次检查
 claudex preflight      # 检查配置、网关模型、订阅定义与目录条目
 claudex                # 用 default_profile 启动会话
 ```
+
+`preflight` 在网关没在运行时报 `gateway_access`；只想先检查配置与目录，用 `claudex preflight --no-proxy-check`，它不连网关。
 
 ## 5. 配置
 
@@ -138,7 +141,7 @@ haiku = "or/vendor/model-c"
 
 以 Anthropic 或 OpenAI 兼容接口提供的套餐，写法同上面的 `plan` 来源：填厂商给的接口地址，列出要用的模型；目录里查不到的模型，显式写 `context`，需要计价就写 `openrouter`。
 
-网关对无档位模型的处理有一处差异。`anthropic` 类来源的无档位模型，网关会剥掉请求里的档位。OpenAI 兼容段（`openrouter`、`openai` 类）没有剥掉档位的写法，网关会按 `low`、`medium`、`high` 转发，上游是否接受可以用 `probe` 看。
+网关对无档位模型的处理有一处差异。`anthropic` 类来源的无档位模型，网关会剥掉请求里的档位；例外是上游模型名恰好是网关内置目录里的 Claude 模型名，这时网关取内置的档位，照常转发。OpenAI 兼容段（`openrouter`、`openai` 类）没有剥掉档位的写法，网关会按 `low`、`medium`、`high` 转发，上游是否接受可以用 `probe` 看。
 
 ### 5.4 派生 settings 与 `settings.base.json`
 
@@ -157,13 +160,14 @@ haiku = "or/vendor/model-c"
 ## 6. 登录、key 与探测
 
 ```bash
-claudex login codex           # 或 antigravity；凭据由网关写在 ~/.local/share/claudex/auth/
 claudex key set or            # 从 stdin 读一行 key，终端输入时不回显；写 keys/or.key（0600）
+claudex login codex           # 或 antigravity；凭据由网关写在 ~/.local/share/claudex/auth/
 claudex probe plan            # 列出来源的上游模型
 claudex probe plan model-f    # 经网关探测已列出的模型
 ```
 
 - `key set` 只接受 `claudex.toml` 里已有的通用来源。
+- 先给配置里的每个通用来源录好 key，再登录订阅：`login` 要先生成网关配置，缺任何一个 key 文件都会报错，并提示对应的 `claudex key set` 命令。
 - `probe` 不带模型 id 时，列出上游的模型：`openai`、`openrouter` 取 `GET <base_url>/models`，`anthropic` 取 `GET <base_url>/v1/models`，上游不提供这个接口时报错说明；订阅来源列出网关模型定义里的模型。
 - 带模型 id 时，这些模型须已写进该来源的 `models`（缺 context 可以），probe 经网关对每个模型发几个极小请求，检验四项：能否应答、工具调用、各档位是否被接受、图片输入。最后打印结果与建议写进配置的 `context`、`efforts`。「档位被接受」只说明上游没有报错，不等于档位真的生效。
 - 订阅来源不做能力探测。
@@ -307,6 +311,7 @@ OAuth 目录、网关二进制与版本目录的位置固定，不受覆盖变�
 
 ## 12. 排障
 
+- **`preflight` 报 `gateway_access`**：网关没在运行，或在运行却不可达。先 `claudex gateway start`；已在运行时看 `claudex status` 的网关进程行与 `~/.local/state/claudex/gateway-bootstrap.log`。
 - **`preflight` 报 `gateway_model`，或启动时报等不到模型注册**：先看 `claudex status` 的网关进程行。网关在跑却没加载新配置时，运行 `claudex gateway restart`。
 - **报 `subscription_definition`**：订阅里没有这个模型，或登录已失效；重新 `claudex login`，或者把这个模型从 `claudex.toml` 里移除。
 - **报 `catalog_entry` 或 `catalog_unparsed`**：OpenRouter 目录里没有这个 slug，或它的条目无法解析；核对 slug，或在配置里显式写 `context`。

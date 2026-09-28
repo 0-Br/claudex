@@ -4,8 +4,8 @@
 # 不写 --profile 或 @名字 时启动的 profile
 default_profile = "daily"
 
-# 会话里屏蔽的 MCP 工具（通配符形式）；启动时加 --with-mcp 可本次放开
-mcp_deny = ["mcp__github__*"]
+# 会话里屏蔽的 MCP 工具（通配符形式），缺省不屏蔽；启动时加 --with-mcp 可本次放开
+# mcp_deny = ["mcp__github__*"]
 
 # 自动压缩窗口 = 四档中最小的 context × 本系数，缺省 0.95
 # compact_window_factor = 0.95

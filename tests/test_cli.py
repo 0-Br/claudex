@@ -163,7 +163,7 @@ def test_init_creates_private_roots_keys_and_starter_files(
     assert (
         paths.client_key_file().read_text() != paths.management_key_file().read_text()
     )
-    assert 'mcp_deny = ["mcp__github__*"]' in paths.config_file().read_text()
+    assert '# mcp_deny = ["mcp__github__*"]' in paths.config_file().read_text()
     assert 'disable-image-generation: "chat"' in paths.gateway_base_file().read_text()
     json.loads(paths.settings_base_file().read_text(encoding="utf-8"))
     assert "已生成" in capsys.readouterr().out
