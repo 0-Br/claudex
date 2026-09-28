@@ -678,14 +678,24 @@ class Launch:
     fast: str
 
 
+def _wait_gone(pid: int) -> bool:
+    """等进程的 /proc 条目消失，返回是否在时限内消失。
+
+    进程退出后到被父进程回收之前是僵尸，`/proc/<pid>` 仍在，启动器的身份核对却已不再
+    匹配，所以 `gateway stop` 返回后要等一会儿才能断言进程不在了。
+    """
+    deadline = time.monotonic() + STOP_WAIT_SECONDS
+    while Path(f"/proc/{pid}").exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return not Path(f"/proc/{pid}").exists()
+
+
 def _stop_process(pid: int) -> None:
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         return
-    deadline = time.monotonic() + STOP_WAIT_SECONDS
-    while Path(f"/proc/{pid}").exists() and time.monotonic() < deadline:
-        time.sleep(0.05)
+    _wait_gone(pid)
 
 
 def _gateway_pid() -> int:
@@ -852,7 +862,7 @@ def test_gateway_start_is_idempotent_and_stop_stops(netns: Namespace) -> None:
 
     stopped = netns.run("gateway", "stop")
     assert stopped.returncode == 0, stopped.stderr
-    assert not Path(f"/proc/{pid}").exists()
+    assert _wait_gone(pid)
     assert not paths.gateway_pid_file().exists()
     assert netns.run("gateway", "stop").returncode == 0
 
@@ -867,10 +877,7 @@ def test_gateway_start_fails_when_gateway_never_healthy(netns: Namespace) -> Non
     assert result.stderr.count("curl:") == 1
     assert "503" in result.stderr
     pid = _gateway_pid()
-    deadline = time.monotonic() + STOP_WAIT_SECONDS
-    while Path(f"/proc/{pid}").exists() and time.monotonic() < deadline:
-        time.sleep(0.05)
-    assert not Path(f"/proc/{pid}").exists()
+    assert _wait_gone(pid)
     requests = netns.gateway_log.read_text(encoding="utf-8").splitlines()
     assert "GET /v1/models auth=yes" in requests
 

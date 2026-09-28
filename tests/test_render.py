@@ -412,6 +412,9 @@ def test_commands_use_current_interpreter(fake_gateway: _Gateway) -> None:
     _snapshot, _profile, settings = _render()
     helper = Path(sysconfig.get_path("scripts")) / "claudex-client-key"
     assert settings["apiKeyHelper"] == shlex.quote(str(helper))
+    # 安装形态真的把入口放在了这里，不只是两处用了同一个算法
+    assert helper.is_file()
+    assert os.access(helper, os.X_OK)
     status_line = settings["statusLine"]
     assert status_line == {
         "type": "command",
