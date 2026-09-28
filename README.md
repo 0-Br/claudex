@@ -229,6 +229,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 | 命令 | 说明 |
 | --- | --- |
 | `claudex [选项…] [claude 参数…]` | 启动会话，见第 7 节 |
+| `claudex -h`、`--help`、`help` | 打印用法；只认第一个参数，放在 profile 之后的 `--help` 原样交给 claude |
 | `claudex init` | 建配置目录、生成 key、写起步文件，见第 4 节 |
 | `claudex key set <来源名>` | 录入上游 key，见第 6 节 |
 | `claudex probe <来源名> [模型 id…]` | 列上游模型、探测模型能力，见第 6 节 |
@@ -294,7 +295,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 | `~/.local/bin/cli-proxy-api` → `~/.local/lib/cliproxyapi/<版本>/cli-proxy-api` | 网关二进制，由受管升级切换 |
 | `$TMPDIR/claudex-sl-<摘要>.json` | 状态栏在会话内的费用结算状态 |
 
-claudex 自己写的 state 文件都是 0600。网关进程以 `umask 077` 拉起，它写出的 `logs/` 目录是 0700、日志与失败快照是 0600。覆盖变量：
+state 目录本身是 0700（拉起网关时收紧，已存在的目录也一样），claudex 自己写的 state 文件都是 0600。网关进程以 `umask 077` 拉起，它写出的 `logs/` 目录是 0700、日志与失败快照是 0600。覆盖变量：
 
 | 变量 | 作用 |
 | --- | --- |

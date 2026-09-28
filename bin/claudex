@@ -104,6 +104,8 @@ ensure_gateway() (
   # 网关进程与它写出的日志、失败快照由此继承私有权限；只作用于本子 shell
   umask 077
   mkdir -p "$STATE_DIR"
+  # state 根放着含全部 key 的 gateway.yaml；已存在的旧目录也在这里收紧
+  chmod 0700 "$STATE_DIR"
   : >> "$BOOT_LOG"
   : >> "$START_LOCK"
   chmod 0600 "$BOOT_LOG" "$START_LOCK"
@@ -287,11 +289,31 @@ launch_session() {
 }
 
 
+usage() {
+  cat <<'EOF'
+usage: claudex [@PROFILE | --profile NAME] [--fable|--opus|--sonnet|--haiku REF]...
+               [--with-mcp] [--fast] [--] [claude arguments...]
+       claudex init | profiles | status | update | completion bash
+       claudex key set SOURCE | login codex|antigravity | probe SOURCE [MODEL...]
+       claudex preflight [--profile NAME] [--format json|human] [--no-proxy-check]
+       claudex upgrade [VERSION] | upgrade --wait RUN_ID [--timeout SECONDS]
+       claudex gateway start|stop|restart
+
+Without a subcommand, claudex starts Claude Code with the selected profile.
+See README.md for configuration and details.
+EOF
+}
+
+
 main() {
   local profile='' with_mcp=0 fast=0
   local tier_args=()
 
   case ${1:-} in
+    -h|--help|help)
+      usage
+      return 0
+      ;;
     @)
       printf 'claudex: @profile needs a non-empty name\n' >&2
       return 2

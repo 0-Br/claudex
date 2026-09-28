@@ -733,6 +733,18 @@ def test_launcher_upgrade_wait_goes_straight_to_cli() -> None:
     assert result.stderr.startswith("claudex: ")
 
 
+@pytest.mark.parametrize("flag", ["-h", "--help", "help"])
+def test_launcher_help_prints_usage_without_gateway(flag: str) -> None:
+    # 没有 claudex.toml、没有网关：打印用法就退出，不生成网关配置
+    result = subprocess.run(
+        [str(LAUNCHER), flag], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("usage: claudex")
+    assert "claudex gateway start|stop|restart" in result.stdout
+    assert not paths.gateway_config_file().exists()
+
+
 # -----------------------------------------------------------------------------
 # 启动器：命名空间里的假网关
 
@@ -943,9 +955,11 @@ def test_launcher_clears_inherited_session_env(netns: Namespace) -> None:
 
 
 def test_gateway_start_is_idempotent_and_stop_stops(netns: Namespace) -> None:
+    paths.state_dir().chmod(0o755)
     started = netns.run("gateway", "start")
     assert started.returncode == 0
     assert "curl:" not in started.stderr
+    assert _mode(paths.state_dir()) == 0o700
     pid = _gateway_pid()
     assert _mode(paths.gateway_pid_file()) == 0o600
     assert netns.run("gateway", "start").returncode == 0
