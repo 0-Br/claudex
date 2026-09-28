@@ -321,6 +321,22 @@ def _gateway_process_line(binary: Path) -> str:
     return f"gateway process: pid {pid}, {gateway.GATEWAY_URL}"
 
 
+def _latest_snapshot(sessions: Path) -> Path | None:
+    """修改时间最新的 profile 快照；目录不在或没有快照时为 None。
+
+    另一个启动同时在清理过期快照，列目录与取修改时间之间被删掉的文件跳过。
+    """
+    if not sessions.is_dir():
+        return None
+    dated: list[tuple[float, Path]] = []
+    for path in sessions.glob("*.profile.json"):
+        try:
+            dated.append((path.stat().st_mtime, path))
+        except FileNotFoundError:
+            continue
+    return max(dated)[1] if dated else None
+
+
 def _status_problems(config: Config, cached: catalog.Catalog) -> list[str]:
     """真问题里不查网关就能判断的一类：`openrouter` slug 不在目录缓存里。"""
     problems: list[str] = []
@@ -363,13 +379,8 @@ def _cmd_status(_args: argparse.Namespace) -> int:
         lines.append(f"gateway binary: {binary} missing (see README)")
     lines.append(f"gateway version: {installed or 'unknown'}")
     lines.append(_gateway_process_line(binary))
-    sessions = paths.sessions_dir()
-    snapshots = (
-        sorted(sessions.glob("*.profile.json"), key=lambda p: p.stat().st_mtime)
-        if sessions.is_dir()
-        else []
-    )
-    lines.append(f"snapshot: {snapshots[-1] if snapshots else 'none'}")
+    latest = _latest_snapshot(paths.sessions_dir())
+    lines.append(f"snapshot: {latest or 'none'}")
     try:
         quota_data = quota.load_quota()
     except ValueError as err:

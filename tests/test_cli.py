@@ -354,6 +354,23 @@ def test_status_without_gateway_exits_zero_with_runtime_lines(
     assert f"{cli.STATUS_PREFIX}gateway process: not running" in lines
 
 
+def test_status_snapshot_line_skips_files_removed_during_listing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # 悬空链接在 glob 里列得出、stat 时 FileNotFoundError，与清理程序删掉文件同一路径
+    _configure()
+    sessions = paths.sessions_dir()
+    sessions.mkdir(parents=True)
+    older = sessions / "alt-000000000000.profile.json"
+    newer = sessions / "daily-111111111111.profile.json"
+    older.write_text("{}", encoding="utf-8")
+    newer.write_text("{}", encoding="utf-8")
+    os.utime(older, (1_000_000, 1_000_000))
+    (sessions / "gone-222222222222.profile.json").symlink_to(sessions / "missing")
+    lines = _status_lines(capsys)
+    assert f"{cli.STATUS_PREFIX}snapshot: {newer}" in lines
+
+
 def test_status_notes_newer_release_without_problem(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
