@@ -293,7 +293,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 | `~/.local/bin/cli-proxy-api` → `~/.local/lib/cliproxyapi/<版本>/cli-proxy-api` | 网关二进制，由受管升级切换 |
 | `$TMPDIR/claudex-sl-<摘要>.json` | 状态栏在会话内的费用结算状态 |
 
-claudex 自己写的 state 文件都是 0600，网关日志的权限由网关决定。覆盖变量：
+claudex 自己写的 state 文件都是 0600。网关进程以 `umask 077` 拉起，它写出的 `logs/` 目录是 0700、日志与失败快照是 0600。覆盖变量：
 
 | 变量 | 作用 |
 | --- | --- |
@@ -311,6 +311,7 @@ OAuth 目录、网关二进制与版本目录的位置固定，不受覆盖变�
 - **目录缓存损坏**：`claudex update`。
 - **`claudex upgrade` 报网关未运行**：先 `claudex gateway start`。报二进制不存在：按第 3 节首装。
 - **状态栏退成一行简版**：stderr 里写着底层渲染器失败的原因。
+- **`gateway stop` 报 `stale gateway PID file`**：PID 文件记的进程已经不是网关（网关已退出），claudex 不替你删它。直接 `claudex gateway start` 会覆盖这份记录；只想清掉就删 `~/.local/state/claudex/gateway.pid`。
 
 ## 13. 安全与备份
 

@@ -21,4 +21,5 @@ claudex 当前状态的快照与展望。
 - `claudex doctor`：把 `status`、`preflight` 与常见故障的排查步骤合成一次诊断。
 - `claudex usage`：按会话与来源汇总费用。
 - 逐模型档位：OpenRouter 目录的 `reasoning.supported_efforts` 字段给出每个模型支持的档位，可替代「支持 reasoning 即 low、medium、high」的缺省规则。
+- 启动器失败分支的用例：`running but not healthy`、端口被不认识的进程占用、残留 PID 文件、网关二进制缺失、`claude` 不在 PATH、渲染没有产出 settings、网关 5 秒内停不下来，这几条出口目前只靠读代码确认，没有命名空间用例。
 - 真实接口核对：OpenRouter `/api/v1/credits` 应答是否带 `data` 包装、Antigravity 上游超时经网关 `api-call` 返回的形态，现有解析对两种形态都接受，尚未在真实接口上逐一核对。

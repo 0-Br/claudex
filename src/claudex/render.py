@@ -723,11 +723,12 @@ def build_profile_snapshot(
 def write_snapshot(
     profile_data: ProfileSnapshot, settings: Mapping[str, object]
 ) -> Snapshot:
-    """把两份内容写成按摘要命名的快照，已存在就复用，返回两份文件的路径。
+    """把两份内容写成按摘要命名的快照，返回两份文件的路径。
 
     摘要取 profile 内容与（不含 `CLAUDEX_PROFILE_FILE` 的）settings 内容的规范 JSON
-    的 sha256；写入的 settings 再补上 `CLAUDEX_PROFILE_FILE`，它由摘要决定。复用的
-    快照同样刷新修改时间。
+    的 sha256；写入的 settings 再补上 `CLAUDEX_PROFILE_FILE`，它由摘要决定。同名快照
+    已存在时内容必然相同，照样原子重写一遍：这样修改时间随启动刷新，正在用的快照不会被
+    按修改时间清理掉。
     """
     digest = hashlib.sha256(
         _canonical(profile_data) + b"\0" + _canonical(settings)
