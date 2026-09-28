@@ -41,10 +41,10 @@ uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com
 
 安装后，`claudex` 与 `claudex-client-key` 两个命令在 `~/.local/bin` 下。运行依赖只有 PyYAML，在 `pyproject.toml` 里钉死版本，因为 `uv tool install` 不读 `uv.lock`。升级时换 tag，重新执行同一条命令并加 `--reinstall`。
 
-首次安装网关二进制：这一步手工做一次，布局与 `claudex upgrade` 管理的一致，之后的升级交给 `claudex upgrade`。
+首次安装网关二进制：这一步手工做一次，布局与 `claudex upgrade` 管理的一致，之后的升级交给 `claudex upgrade`。claudex 的配置生成、就地覆写与热加载前提按 CLIProxyAPI 7.3.20 核实，下面的示例装的就是这个版本；换别的大版本前先核对兼容性。
 
 ```bash
-v=X.Y.Z   # 换成 CLIProxyAPI 的发布版本号，不带 v
+v=7.3.20   # CLIProxyAPI 的发布版本号，不带 v
 dir=~/.local/lib/cliproxyapi/$v
 mkdir -p "$dir" ~/.local/bin && cd "$(mktemp -d)"
 base=https://github.com/router-for-me/CLIProxyAPI/releases/download/v$v
@@ -236,8 +236,8 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 | `claudex profiles` | 列出 profile 与四档，缺省 profile 前标 `*` |
 | `claudex status` | 运行态摘要，不联网，格式见 10.1 |
 | `claudex preflight [--profile NAME] [--format json\|human] [--no-proxy-check]` | 检查配置、网关模型、订阅定义与目录条目，格式见 10.2 |
-| `claudex update` | 强制刷新 OpenRouter 目录，查网关最新版本，列出本机版本之后的变更摘要；不改网关 |
-| `claudex upgrade [VERSION] [--wait RUN_ID --timeout 秒]` | 网关受管升级，缺省升到最新版，见 10.3 |
+| `claudex update` | 强制刷新 OpenRouter 目录，查网关最新版本，列出本机版本之后的变更摘要；最新版是新的大版本时另外说明，并给出本机大版本内的最新版；不改网关 |
+| `claudex upgrade [VERSION] [--wait RUN_ID --timeout 秒]` | 网关受管升级，缺省升到本机大版本内的最新版，跨大版本须显式写版本，见 10.3 |
 | `claudex gateway start\|stop\|restart` | 拉起、停止、受管重启网关，见 10.3 |
 | `claudex completion bash` | 输出 bash 补全脚本，补子命令、`@profile`、档位参数后的模型引用、`key set` 与 `probe` 后的来源名 |
 | `claudex-client-key` | 独立命令：无参调用，输出下游 key 一行；key 文件缺失、权限不是 0600 或格式不对时，非零退出、stdout 为空、stderr 写原因 |
@@ -250,7 +250,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 
 - `runtime      : `：运行态信息，包括版本、配置与 profile、网关二进制与版本、网关进程、最近的快照、各来源的额度缓存、目录缓存时刻；
 - `problem: `：真问题，每个一行；
-- `note: `：说明，不算问题；现在只有一种，即后台刷新记录到比本机新的网关版本。
+- `note: `：说明，不算问题；现在只有一种，即后台刷新记录到比本机新、且与本机同一大版本的网关版本。新的大版本不出这一行，由 `claudex update` 说明。
 
 `status` 不联网，网关没在运行时也退出 0。
 
@@ -273,6 +273,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 - `gateway stop` 按 PID 与进程身份核对后停止网关。
 - `gateway restart` 与 `upgrade` 走同一套受管流程：由脱离当前会话的 worker 执行，核对旧服务身份，停旧，切换版本（仅升级时），起新，核对新服务；任一步失败，回退到旧二进制与旧服务。升级下载官方发布包，并按官方 `checksums.txt` 校验。
 - `upgrade` 要求网关已安装且正在运行，否则报错。
+- 不带版本的 `upgrade` 从最近的正式发布里取与本机网关同一大版本的最新版；已是最新时直接说明并退出 0，取不到本机版本或这个大版本没有发布时报错。跨大版本升级只接受显式版本（`claudex upgrade 8.0.2` 这类），因为新的大版本未经 claudex 核实；受管升级只在新网关不健康时回退，起得来但行为改变的情形它拦不住。
 
 `gateway stop` 与 `restart` 会切断所有正在经网关工作的会话与工具。
 

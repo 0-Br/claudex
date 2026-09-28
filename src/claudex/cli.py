@@ -413,10 +413,12 @@ def _cmd_status(_args: argparse.Namespace) -> int:
         problems.extend(_status_problems(config, cached))
     release = quota.load_release_record()
     latest = release.get("version") if release is not None else None
+    # 只提示同一大版本内的新版；新大版本未经核实，由 claudex update 说明
     if (
         isinstance(latest, str)
         and installed is not None
         and _version_tuple(latest) > _version_tuple(installed)
+        and _version_tuple(latest)[0] == _version_tuple(installed)[0]
     ):
         notes.append(
             f"gateway {latest} is available (installed {installed}); "
@@ -493,12 +495,25 @@ def _cmd_update(_args: argparse.Namespace) -> int:
     quota.write_release_record(latest, int(time.time()))
     _print(f"gateway: latest {latest}, installed {installed or 'unknown'}")
     if installed is not None and _version_tuple(latest) > _version_tuple(installed):
+        major = _version_tuple(installed)[0]
         try:
-            for line in upgrade.changes_since(installed):
-                _print(line)
+            releases = upgrade.fetch_releases()
+            changes = upgrade.parse_changes(releases, installed)
+            same_major = upgrade.latest_in_major(releases, major)
         except (RolloutError, ValueError) as err:
             failures += 1
             _error(f"取变更摘要失败：{err}")
+        else:
+            for line in changes:
+                _print(line)
+            if _version_tuple(latest)[0] > major:
+                _print(
+                    f"gateway: {latest} is a new major version; claudex is verified "
+                    f"against {upgrade.VERIFIED_GATEWAY_VERSION}, so upgrade across "
+                    "major versions only with an explicit version after checking "
+                    "compatibility"
+                )
+                _print(f"gateway: latest {major}.x is {same_major or 'not found'}")
     return EXIT_FAILED if failures else EXIT_OK
 
 
@@ -527,7 +542,19 @@ def _cmd_upgrade(args: argparse.Namespace) -> int:
         if args.version is not None:
             raise ValueError("--wait 与 VERSION 不能同时给")
         return _wait(args.wait, args.timeout)
-    version = args.version or quota.fetch_latest_release()
+    version = args.version
+    if version is None:
+        # 不带版本只在已装网关的大版本内取最新；跨大版本必须显式写版本
+        installed = installed_gateway_version(upgrade.default_gateway_link())
+        if installed is None:
+            raise RolloutError(
+                "取不到已安装网关的版本；显式写版本升级：claudex upgrade X.Y.Z"
+            )
+        major = _version_tuple(installed)[0]
+        version = upgrade.fetch_latest_in_major(major)
+        if version == installed:
+            _print(f"gateway {installed} is already the latest {major}.x release")
+            return EXIT_OK
     _print_armed(
         upgrade.start_upgrade(version, delay_seconds=args.delay),
         f"upgrade to {version}",

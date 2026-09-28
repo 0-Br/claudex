@@ -68,6 +68,8 @@ RELEASE_BASE_URL = "https://github.com/router-for-me/CLIProxyAPI/releases/downlo
 RELEASES_API_URL = "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases"
 RELEASES_PAGE_SIZE = 100
 MAX_CHANGE_POINTS = 10
+# 配置生成、就地覆写与热加载前提按这个版本的网关源码核实；README 第 3 节同值
+VERIFIED_GATEWAY_VERSION = "7.3.20"
 GATEWAY_BINARY_NAME = "cli-proxy-api"
 INSTALL_HINT = "网关二进制不在 {link}；首次安装方法见 README 的「安装」一节"
 NOT_RUNNING_HINT = (
@@ -1001,10 +1003,73 @@ def parse_changes(releases: object, version: str) -> list[str]:
     return lines
 
 
-def changes_since(version: str) -> list[str]:
-    """本机版本之后各发布的标题与要点（GitHub releases API，经环境代理，超时 10 秒）。
+def latest_in_major(releases: object, major: int) -> str | None:
+    """releases 列表里大版本号为 `major` 的最新正式发布 `X.Y.Z`；没有时为 None。
 
-    只取最近 `RELEASES_PAGE_SIZE` 个发布；返回形态见 `parse_changes`。
+    草稿、预发布与 tag 不是 `X.Y.Z` 的发布跳过。
+
+    异常
+    ----------
+    ValueError
+        `releases` 不是列表。
+    """
+    if not isinstance(releases, list):
+        raise ValueError(f"releases 应答必须是列表，收到 {type(releases).__name__}")
+    keys = [
+        key
+        for release in releases
+        if isinstance(release, dict)
+        and not release.get("draft")
+        and not release.get("prerelease")
+        and isinstance(tag := release.get("tag_name"), str)
+        and (key := _version_key(tag)) is not None
+        and key[0] == major
+    ]
+    return ".".join(str(part) for part in max(keys)) if keys else None
+
+
+def fetch_releases() -> object:
+    """最近 `RELEASES_PAGE_SIZE` 个发布（GitHub releases API，经环境代理，超时 10 秒）。
+
+    异常
+    ----------
+    RolloutError
+        请求失败。
+    ValueError
+        应答不是 JSON。
+    """
+    raw = _fetch_bytes(
+        f"{RELEASES_API_URL}?per_page={RELEASES_PAGE_SIZE}", GITHUB_ACCEPT
+    )
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise ValueError(f"releases 应答不是 JSON：{type(err).__name__}") from err
+
+
+def fetch_latest_in_major(major: int) -> str:
+    """大版本号为 `major` 的最新正式发布，供不带版本的 `claudex upgrade` 取目标。
+
+    异常
+    ----------
+    RolloutError
+        请求失败，或最近的发布里没有这个大版本的正式发布。
+    ValueError
+        应答不是 JSON 列表。
+    """
+    version = latest_in_major(fetch_releases(), major)
+    if version is None:
+        raise RolloutError(
+            f"最近 {RELEASES_PAGE_SIZE} 个发布里没有 {major}.x 的正式发布；"
+            "显式写版本升级：claudex upgrade X.Y.Z"
+        )
+    return version
+
+
+def changes_since(version: str) -> list[str]:
+    """本机版本之后各发布的标题与要点，取自 `fetch_releases`。
+
+    返回形态见 `parse_changes`。
 
     异常
     ----------
@@ -1013,14 +1078,7 @@ def changes_since(version: str) -> list[str]:
     ValueError
         应答不是 JSON 列表，或 `version` 不是 `X.Y.Z`。
     """
-    raw = _fetch_bytes(
-        f"{RELEASES_API_URL}?per_page={RELEASES_PAGE_SIZE}", GITHUB_ACCEPT
-    )
-    try:
-        releases: object = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise ValueError(f"releases 应答不是 JSON：{type(err).__name__}") from err
-    return parse_changes(releases, version)
+    return parse_changes(fetch_releases(), version)
 
 
 # -----------------------------------------------------------------------------

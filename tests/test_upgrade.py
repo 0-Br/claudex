@@ -661,6 +661,23 @@ def test_parse_changes_lists_newer_releases() -> None:
     ]
 
 
+def test_latest_in_major_skips_other_majors_and_unreleased() -> None:
+    releases = [{"tag_name": "v8.0.2", "name": "major"}, *_releases()]
+    assert upgrade.latest_in_major(releases, 7) == "7.3.22"
+    assert upgrade.latest_in_major(releases, 8) == "8.0.2"
+    assert upgrade.latest_in_major(releases, 9) is None
+
+
+def test_fetch_latest_in_major_raises_without_release_of_that_major(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        upgrade, "_fetch_bytes", lambda _url, _accept=None: json.dumps([]).encode()
+    )
+    with pytest.raises(upgrade.RolloutError, match=r"7\.x"):
+        upgrade.fetch_latest_in_major(7)
+
+
 def test_parse_changes_caps_points() -> None:
     body = "\n".join(f"- point {index}" for index in range(15))
     lines = upgrade.parse_changes([{"tag_name": "v1.0.1", "body": body}], "1.0.0")

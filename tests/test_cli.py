@@ -384,6 +384,16 @@ def test_status_notes_newer_release_without_problem(
     assert not [line for line in lines if line.startswith(cli.PROBLEM_PREFIX)]
 
 
+def test_status_has_no_note_for_new_major_release(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _configure()
+    monkeypatch.setattr(cli, "installed_gateway_version", lambda _binary: "7.3.20")
+    quota.write_release_record("8.0.2", int(NOW.timestamp()))
+    lines = _status_lines(capsys)
+    assert not [line for line in lines if line.startswith(cli.NOTE_PREFIX)]
+
+
 def test_status_reports_slug_missing_from_catalog(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -458,6 +468,41 @@ def test_update_refreshes_catalog_release_and_changes(
     assert "Old" not in output
 
 
+def test_update_explains_new_major_and_latest_in_installed_major(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    fake_service: FakeService,
+) -> None:
+    fake_service.reply("GET", "/api/v1/models", {"data": []})
+    fake_service.reply("GET", "/latest", {"tag_name": "v8.0.2"})
+    fake_service.reply(
+        "GET",
+        "/releases",
+        [
+            {"tag_name": "v8.0.2", "name": "Major", "body": "- migrate"},
+            {"tag_name": "v7.3.21", "name": "Fix", "body": "- fixed a"},
+            {"tag_name": "v7.3.20", "name": "Old", "body": "- old"},
+        ],
+    )
+    monkeypatch.setattr(
+        catalog,
+        "fetch_catalog",
+        functools.partial(
+            catalog.fetch_catalog, url=f"{fake_service.url}/api/v1/models"
+        ),
+    )
+    monkeypatch.setattr(quota, "LATEST_RELEASE_URL", f"{fake_service.url}/latest")
+    monkeypatch.setattr(upgrade, "RELEASES_API_URL", f"{fake_service.url}/releases")
+    monkeypatch.setattr(cli, "installed_gateway_version", lambda _binary: "7.3.20")
+
+    assert cli.main(["update"]) == 0
+    output = capsys.readouterr().out
+    assert "gateway: latest 8.0.2, installed 7.3.20" in output
+    assert "8.0.2 is a new major version" in output
+    assert f"verified against {upgrade.VERIFIED_GATEWAY_VERSION}" in output
+    assert "gateway: latest 7.x is 7.3.21" in output
+
+
 # -----------------------------------------------------------------------------
 # upgrade 与 gateway restart
 
@@ -481,7 +526,9 @@ def test_upgrade_passes_version_and_delay(
     assert f"--wait {RUN_ID}" in capsys.readouterr().out
 
 
-def test_upgrade_defaults_to_latest_release(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upgrade_defaults_to_latest_in_installed_major(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[str] = []
 
     def fake(version: str, *, delay_seconds: float) -> dict[str, object]:
@@ -490,9 +537,29 @@ def test_upgrade_defaults_to_latest_release(monkeypatch: pytest.MonkeyPatch) -> 
         return _armed()
 
     monkeypatch.setattr(upgrade, "start_upgrade", fake)
-    monkeypatch.setattr(quota, "fetch_latest_release", lambda: "7.3.22")
+    monkeypatch.setattr(cli, "installed_gateway_version", lambda _binary: "7.3.20")
+    monkeypatch.setattr(
+        upgrade, "fetch_latest_in_major", {7: "7.3.22", 8: "8.0.2"}.__getitem__
+    )
     assert cli.main(["upgrade"]) == 0
     assert calls == ["7.3.22"]
+
+
+def test_upgrade_without_version_needs_installed_version(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "installed_gateway_version", lambda _binary: None)
+    assert cli.main(["upgrade"]) == 1
+    assert "claudex upgrade X.Y.Z" in capsys.readouterr().err
+
+
+def test_upgrade_without_version_reports_already_latest(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "installed_gateway_version", lambda _binary: "7.3.20")
+    monkeypatch.setattr(upgrade, "fetch_latest_in_major", lambda _major: "7.3.20")
+    assert cli.main(["upgrade"]) == 0
+    assert "already" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
