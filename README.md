@@ -36,7 +36,7 @@ claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv too
 安装 claudex：
 
 ```bash
-uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.0"
+uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.1"
 ```
 
 安装后，`claudex` 与 `claudex-client-key` 两个命令在 `~/.local/bin` 下。运行依赖只有 PyYAML，在 `pyproject.toml` 里钉死版本，因为 `uv tool install` 不读 `uv.lock`。升级时换 tag，重新执行同一条命令并加 `--reinstall`。
