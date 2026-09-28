@@ -39,6 +39,12 @@ _claudex() {
       return 0
       ;;
   esac
+  # bash 默认的 COMP_WORDBREAKS 含 @，`claudex @da` 在 COMP_WORDS 里拆成 `@` 与 `da`，readline 替换的
+  # 却是整个 `@da`，所以候选同样要带 @ 前缀
+  if ((COMP_CWORD == 2)) && [[ $prev == @ ]]; then
+    mapfile -t COMPREPLY < <(compgen -P @ -W "$(claudex _complete profiles 2>/dev/null)" -- "$cur")
+    return 0
+  fi
   if [[ $cur == @* ]]; then
     local names
     names=$(claudex _complete profiles 2>/dev/null)

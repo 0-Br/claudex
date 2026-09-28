@@ -239,6 +239,40 @@ def test_completion_bash_parses(capsys: pytest.CaptureFixture[str]) -> None:
     assert "complete -F _claudex claudex" in script
 
 
+@pytest.mark.parametrize(
+    ("words", "expected"),
+    [
+        # bash 默认的 COMP_WORDBREAKS 含 @，`@d` 在 COMP_WORDS 里拆成 `@` 与 `d`，而 readline
+        # 替换的是整个 `@d`（交互 shell 实测），候选因此带 @
+        (["claudex", "@", "d"], ["@daily", "@deepseek"]),
+        # COMP_WORDBREAKS 里没有 @ 时是一个词
+        (["claudex", "@d"], ["@daily", "@deepseek"]),
+    ],
+)
+def test_completion_bash_completes_at_profile(
+    capsys: pytest.CaptureFixture[str], words: list[str], expected: list[str]
+) -> None:
+    assert cli.main(["completion", "bash"]) == 0
+    script = capsys.readouterr().out
+    stub = (
+        "claudex() { [[ $1 == _complete && $2 == profiles ]] && "
+        "printf '%s\\n' daily deepseek gpt; }\n"
+    )
+    call = (
+        f"COMP_WORDS=({' '.join(words)}); COMP_CWORD={len(words) - 1}\n"
+        "_claudex; printf '%s\\n' \"${COMPREPLY[@]}\"\n"
+    )
+    completed = subprocess.run(
+        ["bash", "--norc", "--noprofile"],
+        input=script + stub + call,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.split() == expected
+
+
 def test_complete_lists_generic_sources(capsys: pytest.CaptureFixture[str]) -> None:
     _configure(CONFIG_TEXT + SUBSCRIPTION_SOURCE)
     capsys.readouterr()
