@@ -125,6 +125,9 @@ def test_list_requires_this_sources_key(fake_service: FakeService) -> None:
     _write_key(paths.source_key_file("alpha"), ALPHA_KEY, mode=0o644)
     with pytest.raises(ProbeError, match="0600"):
         probe.list_upstream_models(_config(f"{fake_service.url}/v1"), "alpha")
+    _write_key(paths.source_key_file("alpha"), ALPHA_KEY + "\r")
+    with pytest.raises(ProbeError, match="格式不对"):
+        probe.list_upstream_models(_config(f"{fake_service.url}/v1"), "alpha")
     assert not fake_service.requests
 
 

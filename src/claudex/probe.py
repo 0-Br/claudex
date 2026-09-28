@@ -82,14 +82,14 @@ def read_source_key(name: str) -> str:
     path = paths.source_key_file(name)
     try:
         mode = stat.S_IMODE(path.stat().st_mode)
-        raw = path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8", newline="")
     except FileNotFoundError:
         raise ProbeError(f"{path} 不存在；运行 claudex key set {name} 写入") from None
     except (OSError, UnicodeDecodeError) as err:
         raise ProbeError(f"{path} 读取失败（{type(err).__name__}）") from None
     if mode != KEY_FILE_MODE:
         raise ProbeError(f"{path} 的权限应为 0600，实际为 {mode:04o}")
-    key = raw.rstrip("\r\n")
+    key = raw.removesuffix("\n")
     if not key or any(character.isspace() for character in key):
         raise ProbeError(f"{path} 格式不对：应为一行不含空白的 key")
     return key

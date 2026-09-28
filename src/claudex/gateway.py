@@ -73,7 +73,10 @@ class GatewaySecrets:
 
 
 def _read_key_file(path: Path, what: str, hint: str, *, hex64: bool) -> str:
-    """读一个 key 文件：先查权限为 0600，再去掉结尾换行后校验格式。
+    """读一个 key 文件：先查权限为 0600，再去掉结尾的一个 `\\n` 后校验格式。
+
+    与 `claudex-client-key` 同口径：内容是一行，CRLF 结尾与多余空行留下的空白字符
+    都报格式错误。
 
     消息只含路径、期望与实际权限，不含文件内容。
     """
@@ -89,7 +92,8 @@ def _read_key_file(path: Path, what: str, hint: str, *, hex64: bool) -> str:
             f"运行 chmod 600 {path}"
         )
     try:
-        raw = path.read_text(encoding="utf-8")
+        # newline="" 保留原样的行尾，CRLF 不被通用换行模式悄悄转成 \n
+        raw = path.read_text(encoding="utf-8", newline="")
     except FileNotFoundError:
         raise GatewayError(f"{what} {path} 不存在；{hint}") from None
     except UnicodeDecodeError:
@@ -97,7 +101,7 @@ def _read_key_file(path: Path, what: str, hint: str, *, hex64: bool) -> str:
         raise GatewayError(f"{what} {path} 不是 UTF-8 文本；{hint}") from None
     except OSError as err:
         raise GatewayError(f"{what} {path} 读取失败：{err.strerror}") from None
-    key = raw.rstrip("\r\n")
+    key = raw.removesuffix("\n")
     if hex64:
         if _HEX64.fullmatch(key) is None:
             raise GatewayError(

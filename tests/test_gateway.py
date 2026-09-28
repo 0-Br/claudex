@@ -453,6 +453,10 @@ def test_load_secrets_reports_missing_source_key_path() -> None:
         ("management", MANAGEMENT_KEY[:-1]),
         ("alpha", ALPHA_KEY + " trailing"),
         ("alpha", ""),
+        # 与 claudex-client-key 同口径：一行，最多一个结尾 \n；CRLF 与多余空行都报错
+        ("client", CLIENT_KEY + "\r"),
+        ("alpha", ALPHA_KEY + "\r"),
+        ("alpha", ALPHA_KEY + "\n"),
     ],
 )
 def test_malformed_key_file_error_omits_content(which: str, bad: str) -> None:
