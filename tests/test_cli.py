@@ -81,7 +81,17 @@ FAKE_CLAUDE = """\
 printf '%s\\n' "$@" > "$FAKE_CLAUDE_OUT/argv"
 printf '%s' "${ANTHROPIC_CUSTOM_HEADERS-<unset>}" > "$FAKE_CLAUDE_OUT/headers"
 printf '%s' "${CLAUDEX_FAST-<unset>}" > "$FAKE_CLAUDE_OUT/fast"
+for name in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDEX_STATUSLINE_COMMAND \\
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW; do
+  printf '%s=%s\\n' "$name" "${!name-<unset>}"
+done > "$FAKE_CLAUDE_OUT/inherited"
 """
+INHERITED_SESSION_ENV = (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDEX_STATUSLINE_COMMAND",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
+)
 
 
 def _catalog(*extra: str) -> Catalog:
@@ -795,6 +805,15 @@ def test_launcher_fast_is_generated_and_not_inherited(netns: Namespace) -> None:
     assert plain.fast == "<unset>"
 
 
+def test_launcher_clears_inherited_session_env(netns: Namespace) -> None:
+    # 从 claudex 会话或带认证变量的 shell 里启动：继承值不得进入新会话，派生 settings
+    # 的 env 需要它们时自己给出
+    inherited: dict[str, str] = dict.fromkeys(INHERITED_SESSION_ENV, "inherited-value")
+    _launch(netns, env=inherited)
+    seen = (netns.claude_out / "inherited").read_text(encoding="utf-8").splitlines()
+    assert seen == [f"{name}=<unset>" for name in INHERITED_SESSION_ENV]
+
+
 def test_gateway_start_is_idempotent_and_stop_stops(netns: Namespace) -> None:
     started = netns.run("gateway", "start")
     assert started.returncode == 0
@@ -837,6 +856,20 @@ def test_gateway_start_fails_when_gateway_never_healthy(netns: Namespace) -> Non
     assert not Path(f"/proc/{pid}").exists()
     requests = netns.gateway_log.read_text(encoding="utf-8").splitlines()
     assert "GET /v1/models auth=yes" in requests
+
+
+def test_gateway_start_refuses_when_port_check_fails(
+    netns: Namespace, tmp_path: Path
+) -> None:
+    broken = tmp_path / "broken-ss"
+    broken.mkdir()
+    _write_executable(broken / "ss", "#!/usr/bin/env bash\nexit 1\n")
+    result = netns.run(
+        "gateway", "start", env={"PATH": f"{broken}:{netns.env['PATH']}"}
+    )
+    assert result.returncode != 0
+    assert "cannot tell whether port 8317 is free" in result.stderr
+    assert not paths.gateway_pid_file().exists()
 
 
 def test_healthcheck_keeps_client_key_out_of_argv(netns: Namespace) -> None:

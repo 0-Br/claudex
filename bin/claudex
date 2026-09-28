@@ -54,8 +54,15 @@ pid_matches() {
 }
 
 
+# 有监听返回 0、空闲返回 1；ss 本身失败时报错并返回 2，调用方据此拒绝拉起，不当作空闲
 port_in_use() {
-  ss -H -ltn "sport = :$GATEWAY_PORT" | grep -q .
+  local listeners
+
+  if ! listeners=$(ss -H -ltn "sport = :$GATEWAY_PORT"); then
+    printf 'claudex: ss failed; cannot tell whether port %s is free\n' "$GATEWAY_PORT" >&2
+    return 2
+  fi
+  [[ -n $listeners ]]
 }
 
 
@@ -92,7 +99,7 @@ healthcheck() {
 
 # 已在跑且健康返回 0；没在跑就拉起并等到健康。不健康或拉不起来时非零退出（受管升级的 worker 依赖这一点）。
 ensure_gateway() (
-  local attempt started_pid pid
+  local attempt started_pid pid port_state
 
   # 网关进程与它写出的日志、失败快照由此继承私有权限；只作用于本子 shell
   umask 077
@@ -116,8 +123,13 @@ ensure_gateway() (
     printf 'claudex: gateway binary not found at %s; see the README for installation\n' "$GATEWAY_BIN" >&2
     return 1
   fi
-  if port_in_use; then
+  port_state=0
+  port_in_use || port_state=$?
+  if ((port_state == 0)); then
     printf 'claudex: port %s is occupied by an unrecognized process\n' "$GATEWAY_PORT" >&2
+    return 1
+  fi
+  if ((port_state == 2)); then
     return 1
   fi
 
@@ -202,11 +214,14 @@ prepare_gateway() {
 }
 
 
-# 从继承的环境里去掉 Fast 状态：Fast 请求头与 CLAUDEX_FAST 由派生 settings 的 env 给出，
-# 从 --fast 会话里再起的会话不得沿用。只剥 X-Claudex-Tier 这一行（头名不分大小写、允许前导空白），
+# 从继承的环境里去掉会话状态与别的认证：Fast 请求头、CLAUDEX_FAST、状态栏底层渲染器与 compact
+# 窗口由派生 settings 的 env 给出，从 claudex 会话里再起的会话不得沿用；会话只经 apiKeyHelper
+# 取本机网关的 client key，继承的 ANTHROPIC_API_KEY 与 ANTHROPIC_AUTH_TOKEN 会盖过它。
+# ANTHROPIC_CUSTOM_HEADERS 只剥 X-Claudex-Tier 这一行（头名不分大小写、允许前导空白），
 # 其余自定义头原样保留，剥完为空就整个 unset
-clear_inherited_fast() {
-  unset CLAUDEX_FAST
+clear_inherited_session_env() {
+  unset CLAUDEX_FAST CLAUDEX_STATUSLINE_COMMAND CLAUDE_CODE_AUTO_COMPACT_WINDOW \
+    ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
   local headers=${ANTHROPIC_CUSTOM_HEADERS-}
   [[ -n ${ANTHROPIC_CUSTOM_HEADERS+set} ]] || return 0
   local kept='' line probe
@@ -247,7 +262,7 @@ launch_session() {
     printf 'claudex: claude is not on PATH\n' >&2
     return 1
   }
-  clear_inherited_fast
+  clear_inherited_session_env
   prepare_gateway || return 1
   local output
   output=$(run_python _render "${render_args[@]}" "${tier_args[@]}") || return 1

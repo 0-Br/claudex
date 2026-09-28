@@ -26,7 +26,7 @@ claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv too
 
 ## 2. 前置条件
 
-- Linux x86_64。启动器用到 `bash`、`curl`、`flock` 与 `/proc`。
+- Linux x86_64。启动器用到 `bash`、`curl`、`flock`、`ss`（iproute2）与 `/proc`；`ss` 不可用时拒绝拉起网关。
 - uv，以及 uv 托管的 Python 3.14（`uv python install --no-bin 3.14`）。
 - Claude Code：`claude` 命令在 PATH 上，claudex 取 PATH 上的第一个。
 - CLIProxyAPI 网关的二进制，位置固定为 `~/.local/bin/cli-proxy-api`，首装方法见第 3 节。网关端口固定为 8317，不能改。
@@ -182,6 +182,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 - profile 只从 `@名字`、`--profile` 或 `default_profile` 取，不读环境变量。
 - `--fable`、`--opus`、`--sonnet`、`--haiku` 后接模型引用，可以重复。
 - `--fast` 让会话给网关带 `X-Claudex-Tier: fast` 请求头；不带时，从上一个会话继承的 Fast 头与 `CLAUDEX_FAST` 会被清掉。Fast 档只对 Codex 来源生效：主对话档 `fable` 不是 Codex 来源时，启动时会提示主对话不会走 Fast，而会话里落到 Codex 来源的请求仍按 Fast 计费。
+- 启动前清掉继承来的 `ANTHROPIC_API_KEY`、`ANTHROPIC_AUTH_TOKEN`、`CLAUDEX_STATUSLINE_COMMAND` 与 `CLAUDE_CODE_AUTO_COMPACT_WINDOW`：会话只经 `apiKeyHelper` 取本机网关的 key，后两个由派生 settings 按本次 profile 给出。
 
 ## 8. 状态栏
 
