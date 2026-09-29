@@ -164,6 +164,8 @@ def _model_entries(
         levels = ref.efforts if ref.efforts is not None else efforts.get(ref.ref)
         if levels:
             entry["thinking"] = {"levels": list(levels)}
+        if ref.input_modalities is not None:
+            entry["input-modalities"] = list(ref.input_modalities)
         entries.append(entry)
     return entries
 

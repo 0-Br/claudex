@@ -43,11 +43,12 @@ SETTINGS_SUFFIX = ".settings.json"
 # 1M 管理，不带的未知 id 按 200k；Claude Code 发请求前会剥掉后缀，网关收到的名字不变
 CONTEXT_1M_THRESHOLD = 200_000
 ONE_M_SUFFIX = "[1m]"
-# Claude Code 把四档的规范 id 经 `modelOverrides` 映射到后端，`/effort` 也按这些 id 记
+# Claude Code 把四档的规范 id 经 `modelOverrides` 映射到后端，`/effort` 也按这些 id 记；
+# 键按精确 id 匹配、不认识的键被忽略，Anthropic 每发一个同档新型号都要在这里补上它的 id
 MODEL_OVERRIDE_KEYS = {
     "fable": ("claude-fable-5", "claude-fable-5-1"),
-    "opus": ("claude-opus-5",),
-    "sonnet": ("claude-sonnet-5",),
+    "opus": ("claude-opus-5", "claude-opus-5-5"),
+    "sonnet": ("claude-sonnet-5", "claude-sonnet-5-5"),
     "haiku": ("claude-haiku-4-5", "claude-haiku-4-5-20251001"),
 }
 # 生成器产出、不从基底透传的键

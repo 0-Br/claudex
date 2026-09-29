@@ -104,8 +104,8 @@ def test_valid_config_parses_into_structure() -> None:
         type="codex",
         base_url=None,
         models=(
-            config.ModelEntry("alpha-1", None, None, None, None),
-            config.ModelEntry("alpha-2", None, None, None, None),
+            config.ModelEntry("alpha-1", None, None, None, None, None),
+            config.ModelEntry("alpha-2", None, None, None, None, None),
         ),
     )
     assert parsed.sources["oa"].base_url == "https://oa.example.invalid/v1"
@@ -115,6 +115,7 @@ def test_valid_config_parses_into_structure() -> None:
         context=256000,
         efforts=("low", "high"),
         display="Epsilon Two",
+        input_modalities=None,
     )
     assert parsed.profiles["alt"] == config.Profile(
         name="alt",
@@ -151,6 +152,7 @@ def test_subscription_source_accepts_table_entries_without_slug_default() -> Non
         context=400000,
         efforts=("low", "medium"),
         display="Alpha Two",
+        input_modalities=None,
     )
     assert parsed.sources["ag"].models[0].openrouter is None
     resolved = config.resolve_ref(parsed, "sub/alpha-2")
@@ -383,6 +385,21 @@ INVALID_CASES: list[tuple[str, Callable[[dict[str, object]], None], str]] = [
         "sources.acme.models[1].efforts",
     ),
     (
+        "model-modalities-wrong-source",
+        _set_model("acme", 1, {"id": "epsilon-2", "input_modalities": ["text"]}),
+        "sources.acme.models[1].input_modalities",
+    ),
+    (
+        "model-modalities-empty",
+        _set_model("oa", 0, {"id": "delta-1", "input_modalities": []}),
+        "sources.oa.models[0].input_modalities",
+    ),
+    (
+        "model-modalities-duplicate",
+        _set_model("oa", 0, {"id": "delta-1", "input_modalities": ["text", "text"]}),
+        "sources.oa.models[0].input_modalities",
+    ),
+    (
         "model-efforts-unknown",
         _set_model("acme", 1, {"id": "epsilon-2", "efforts": ["low", "ultra"]}),
         "sources.acme.models[1].efforts[1]",
@@ -541,6 +558,7 @@ def test_resolve_ref_for_subscription_source_uses_upstream_id() -> None:
         context=None,
         efforts=None,
         display=None,
+        input_modalities=None,
     )
 
 
@@ -588,3 +606,11 @@ def test_profile_refs_rejects_unknown_profile() -> None:
     parsed = config.parse_config(valid_data())
     with pytest.raises(ConfigError, match="nope"):
         config.profile_refs(parsed, "nope")
+
+
+def test_input_modalities_parse_for_openai_compatible_source() -> None:
+    data = valid_data()
+    _models(data, "oa")[0] = {"id": "delta-1", "input_modalities": ["text"]}
+    parsed = config.parse_config(data)
+    assert parsed.sources["oa"].models[0].input_modalities == ("text",)
+    assert config.resolve_ref(parsed, "oa/delta-1").input_modalities == ("text",)

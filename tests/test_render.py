@@ -391,7 +391,9 @@ def test_model_available_models_and_overrides(fake_gateway: _Gateway) -> None:
         "claude-fable-5": "or/vendor-model-c[1m]",
         "claude-fable-5-1": "or/vendor-model-c[1m]",
         "claude-opus-5": "model-a[1m]",
+        "claude-opus-5-5": "model-a[1m]",
         "claude-sonnet-5": "plan/model-f[1m]",
+        "claude-sonnet-5-5": "plan/model-f[1m]",
         "claude-haiku-4-5": "model-b",
         "claude-haiku-4-5-20251001": "model-b",
     }
@@ -496,7 +498,9 @@ def test_model_settings_clamp_user_effort(fake_gateway: _Gateway) -> None:
         "claude-fable-5": {"effortLevel": "high"},
         "claude-fable-5-1": {"effortLevel": "high"},
         "claude-opus-5": {"effortLevel": "low"},
+        "claude-opus-5-5": {"effortLevel": "low"},
         "claude-sonnet-5": {"effortLevel": "high"},
+        "claude-sonnet-5-5": {"effortLevel": "high"},
         "claude-haiku-4-5": {"effortLevel": "high"},
         "claude-haiku-4-5-20251001": {"effortLevel": "high"},
     }

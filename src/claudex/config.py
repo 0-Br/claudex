@@ -22,7 +22,9 @@ TOP_LEVEL_KEYS = (
     "sources",
     "profiles",
 )
-MODEL_KEYS = ("id", "openrouter", "context", "efforts", "display")
+MODEL_KEYS = ("id", "openrouter", "context", "efforts", "display", "input_modalities")
+# 允许声明 input_modalities 的来源类型：只有它们在网关里生成 `openai-compatibility` 条目
+MODALITY_SOURCE_TYPES = ("openrouter", "openai")
 # 各 type 的来源表允许出现的键
 SOURCE_KEYS = {
     "codex": ("type", "models"),
@@ -49,6 +51,7 @@ class ModelEntry:
     context: int | None
     efforts: tuple[str, ...] | None
     display: str | None
+    input_modalities: tuple[str, ...] | None
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,7 @@ class ModelRef:
     context: int | None
     efforts: tuple[str, ...] | None
     display: str | None
+    input_modalities: tuple[str, ...] | None
 
 
 def _kind(value: object) -> str:
@@ -145,6 +149,16 @@ def _parse_efforts(value: object, where: str) -> tuple[str, ...]:
     return tuple(str(level) for level in value)
 
 
+def _parse_modalities(value: object, where: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise ConfigError(f"{where} 必须是非空列表，收到 {value!r}")
+    for index, modality in enumerate(value):
+        _non_empty_string(modality, f"{where}[{index}]")
+    if len(set(value)) != len(value):
+        raise ConfigError(f"{where} 不得有重复项，收到 {value!r}")
+    return tuple(str(modality) for modality in value)
+
+
 def _parse_model(value: object, source_type: str, where: str) -> ModelEntry:
     default_slug_from_id = source_type == "openrouter"
     if isinstance(value, str):
@@ -155,9 +169,15 @@ def _parse_model(value: object, source_type: str, where: str) -> ModelEntry:
             context=None,
             efforts=None,
             display=None,
+            input_modalities=None,
         )
     table = _require_table(value, where)
     _reject_unknown_keys(table, MODEL_KEYS, where)
+    if "input_modalities" in table and source_type not in MODALITY_SOURCE_TYPES:
+        raise ConfigError(
+            f"{where}.input_modalities 只用于 {list(MODALITY_SOURCE_TYPES)} 类来源，"
+            f"本来源是 {source_type!r}"
+        )
     if "id" not in table:
         raise ConfigError(f"{where}.id 必填")
     model_id = _non_empty_string(table["id"], f"{where}.id")
@@ -185,6 +205,11 @@ def _parse_model(value: object, source_type: str, where: str) -> ModelEntry:
         display=(
             _non_empty_string(table["display"], f"{where}.display")
             if "display" in table
+            else None
+        ),
+        input_modalities=(
+            _parse_modalities(table["input_modalities"], f"{where}.input_modalities")
+            if "input_modalities" in table
             else None
         ),
     )
@@ -274,6 +299,7 @@ def _resolve(sources: dict[str, Source], ref: str, where: str) -> ModelRef:
         context=entry.context,
         efforts=entry.efforts,
         display=entry.display,
+        input_modalities=entry.input_modalities,
     )
 
 

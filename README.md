@@ -129,7 +129,8 @@ haiku = "or/vendor/model-c"
   - `id`：必填；
   - `openrouter`：计价与元数据借用的 OpenRouter slug；`openrouter` 类来源不写时等于 `id`，其他类型不写就没有 slug；
   - `context`、`efforts`：覆盖自动取得的值；
-  - `display`：状态栏与模型选择器里的显示名。
+  - `display`：状态栏与模型选择器里的显示名；
+  - `input_modalities`：只用于 `openrouter` 与 `openai` 类来源，非空字符串列表，原样写进网关模型条目的 `input-modalities`。不收图的模型写 `["text"]`，网关就不再把图片转给它（不声明时，图片会被转成文本发过去，模型据此静默答错）；`probe` 报出不接受图片输入时照此填写。
 - 模型引用写 `<来源名>/<模型 id>`，在第一个 `/` 处切开，模型 id 里可以再含 `/`。profile 的 `fable`、`opus`、`sonnet`、`haiku` 四档都必须引用已列出的模型。
 - `openai` 与 `anthropic` 类来源必须写 `base_url`（`http://` 或 `https://` 开头）；`openrouter` 与订阅来源不写。
 

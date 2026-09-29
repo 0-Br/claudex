@@ -704,3 +704,35 @@ def test_wait_for_models_rejects_zero_attempts() -> None:
 
 def test_wait_defaults_are_named_constants() -> None:
     assert (gateway.WAIT_ATTEMPTS, gateway.WAIT_INTERVAL_SECONDS) == (20, 0.5)
+
+
+def test_models_with_input_modalities_declare_them() -> None:
+    parsed = parse_config(
+        {
+            "default_profile": "daily",
+            "sources": {
+                "beta": {
+                    "type": "openai",
+                    "base_url": "https://example.invalid/v1",
+                    "models": [
+                        {"id": "model-d", "input_modalities": ["text"]},
+                        "model-g",
+                    ],
+                },
+            },
+            "profiles": {
+                "daily": {
+                    "fable": "beta/model-d",
+                    "opus": "beta/model-d",
+                    "sonnet": "beta/model-g",
+                    "haiku": "beta/model-g",
+                },
+            },
+        }
+    )
+    content = gateway.build_gateway_config(parsed, {}, _secrets())
+    models = _section(content, "openai-compatibility")[0]["models"]
+    assert models == [
+        {"name": "model-d", "alias": "model-d", "input-modalities": ["text"]},
+        {"name": "model-g", "alias": "model-g"},
+    ]

@@ -16,6 +16,7 @@ type = "codex"
 models = ["model-a"]
 
 # OpenRouter 来源：模型 id 就是 OpenRouter slug；key 用 claudex key set or 写入
+# 不收图的模型写成表并声明 input_modalities，如 { id = "vendor/model-c", input_modalities = ["text"] }
 [sources.or]
 type = "openrouter"
 models = ["vendor/model-c", "vendor/model-d"]

@@ -63,3 +63,11 @@ claudex 项目决策的 append-only 日志。
 **理由**：受管升级只在新网关不健康时回退，网关起得来但改写或误读生成的配置时拦不住；跨大版本应当是一次知情的显式操作，而不是照着提示顺手执行。
 
 **影响**：`upgrade.py` 增加 `fetch_releases`、`latest_in_major`、`fetch_latest_in_major`；README 第 3 节首装示例写 7.3.20，第 10 节说明新的升级规则。
+
+### 2026-09-29: 型号键表补 5.5 代 id，通用来源支持 input_modalities
+
+**背景**：Claude Code 2.1.284 起 `sonnet` 解析到 `claude-sonnet-5-5`，Opus 档对应 `claude-opus-5-5`，派生 settings 的 `modelOverrides` 与 `modelSettings` 只列了上一代 id，显式写新 id 的请求按原 id 发到网关。另外，不收图的 OpenAI 兼容模型收到图片时，网关把图片转成文本转发，模型据此静默答错；网关提供 `input-modalities` 声明，但 `claudex.toml` 没有对应字段。
+
+**选择**：`render.MODEL_OVERRIDE_KEYS` 的 opus、sonnet 两档各补 5.5 代 id。`modelOverrides` 的键是具体型号 id，不认识的键被忽略（Claude Code changelog 的记载），没有前缀匹配，所以按 id 逐个登记，每出一个同档新型号补一次。模型表新增可选字段 `input_modalities`，只允许 `openrouter` 与 `openai` 类来源，原样写进网关 `openai-compatibility` 模型条目的 `input-modalities`。
+
+**影响**：`config.py` 的 `ModelEntry`、`ModelRef` 与解析；`gateway.py` 的模型条目生成；README 第 5.2 节与两份 `claudex.toml` 模板；对应测试；版本 0.1.2。
