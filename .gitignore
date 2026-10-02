@@ -1,13 +1,41 @@
-# 就地虚拟环境（uv 创建）
-.venv/
+# Python 编译产物
+__pycache__/
+*.pyc
+
+# 工具缓存
+.pytest_cache/
+.ruff_cache/
 
 # 打包产物
 build/
 dist/
 *.egg-info/
 
-# Python 与工具缓存
-__pycache__/
-*.pyc
-.pytest_cache/
-.ruff_cache/
+# 就地虚拟环境（uv 等工具创建）
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 系统与编辑器文件
+.DS_Store
+._*
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+\#*\#
+
+# 敏感信息（密钥、凭据类一律忽略；需保留模板文件时用 ! 例外）
+.env
+.env.*
+*.pem
+# *.key 与 Keynote 文稿后缀相撞时，在文件末尾用 ! 例外保留
+*.key
+id_rsa*
+id_ed25519*
+.credentials.json
+auth.json
+credentials.json
