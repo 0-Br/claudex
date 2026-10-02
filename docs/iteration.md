@@ -7,7 +7,7 @@ claudex 当前状态的快照与展望。
 - 运行环境：uv 项目，Python 3.14；开发环境 `uv sync --locked --group dev --python 3.14`，源码树的 `bin/claudex` 可直接运行；日常运行按 tag 安装为 uv tool。运行时需要 PATH 上的 `claude` 与 `~/.local/bin/cli-proxy-api`（README 第 2、3 节）。
 - 来源：`codex`、`antigravity`、`openrouter`、`openai`、`anthropic` 五种 type 可用，写法见 README 第 5 节。
 - 命令：README 第 10 节所列命令全部可用。
-- 验证：测试全部离线，启动器用例需要非特权用户命名空间；类型检查基线为空，检查命令见 AGENTS.md「开发与验证」节。
+- 验证：测试全部离线，启动器用例需要非特权用户命名空间；lint、格式与类型检查都是零诊断，检查命令见 AGENTS.md「开发与验证」节。
 
 ## 已知问题
 

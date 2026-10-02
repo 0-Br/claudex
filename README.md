@@ -36,7 +36,7 @@ claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv too
 安装 claudex：
 
 ```bash
-uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.2"
+uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.3"
 ```
 
 安装后，`claudex` 与 `claudex-client-key` 两个命令在 `~/.local/bin` 下。运行依赖只有 PyYAML，在 `pyproject.toml` 里钉死版本，因为 `uv tool install` 不读 `uv.lock`。升级时换 tag，重新执行同一条命令并加 `--reinstall`。
@@ -92,7 +92,7 @@ claudex                # 用 default_profile 启动会话
 
 ```toml
 default_profile = "daily"
-mcp_deny = ["mcp__github__*"]      # 可选；不写即不屏蔽任何 MCP 工具
+mcp_deny = ["mcp__example__*"]     # 可选；不写即不屏蔽任何 MCP 工具
 compact_window_factor = 0.95       # 可选，缺省 0.95
 
 [sources.sub]
@@ -335,12 +335,12 @@ OAuth 目录、网关二进制与版本目录的位置固定，不受覆盖变�
 ```bash
 uv sync --locked --group dev --python 3.14
 uv run --locked pytest
-uv run --locked ruff check . && uv run --locked ruff format --check .
-uv run --locked basedpyright --baselinemode=discard
+ruff check . && ruff format --check .
+basedpyright --pythonpath .venv/bin/python
 shellcheck -x bin/claudex bin/claudex-client-key
 ```
 
-源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
+ruff 与 basedpyright 不在项目环境里，用开发机上已装的命令；仓库不带 ruff 配置，规则取 ruff 的用户级配置。类型检查的门槛是零诊断。源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
 
 ## 15. 许可证
 

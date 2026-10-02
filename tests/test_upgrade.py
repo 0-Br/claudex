@@ -1,7 +1,8 @@
-"""claudex.upgrade：归档安全、状态机与回退、worker 调用的启动器命令、锁、wait 与变更摘要。
+"""claudex.upgrade：归档安全、状态机与回退、worker 调的启动器命令、锁、wait 与变更摘要。
 
-归档是 `tmp_path` 里现场构造的 tar 包；下载经 monkeypatch 替换 `claudex.upgrade._fetch_bytes`；
-启动器是写在 `tmp_path` 下的 shell 脚本，记录收到的参数。
+归档是 `tmp_path` 里现场构造的 tar 包；下载经 monkeypatch 替换
+`claudex.upgrade._fetch_bytes`；启动器是写在 `tmp_path` 下的 shell 脚本，记录收到的
+参数。
 """
 
 import hashlib
@@ -596,7 +597,9 @@ def test_detached_restart_reaches_healthy(tmp_path: Path) -> None:
         "#!/bin/sh\n"
         f'echo "$@" >> {log}\n'
         'case "$2" in\n'
-        f"  stop) if [ -f '{pid_file}' ]; then kill \"$(cat '{pid_file}')\" 2>/dev/null || true; rm -f '{pid_file}'; fi ;;\n"
+        f"  stop) if [ -f '{pid_file}' ]; then "
+        f"kill \"$(cat '{pid_file}')\" 2>/dev/null || true; "
+        f"rm -f '{pid_file}'; fi ;;\n"
         f"  start) '{link}' 30 & echo $! > '{pid_file}' ;;\n"
         "  *) exit 2 ;;\n"
         "esac\n",

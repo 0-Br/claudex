@@ -24,7 +24,7 @@ claudex 以专用 settings 启动 Claude Code，让它的四个模型档位（fa
 - Python 3.14，只依赖 PyYAML（钉死版本），其余标准库。
 - 启动器是 bash，因为它要在 `exec claude` 之前管理网关进程（flock、PID 身份核对、端口与健康检查），这部分只实现一份，Python 侧需要启停网关时也调它。
 - 打包用 hatchling；启动器与 `claudex-client-key` 作为 shared-scripts 装进 uv tool 环境的 `bin/`，日常按 git tag 安装为 uv tool。
-- 开发工具：pytest、ruff、basedpyright（standard 档），版本由 `uv.lock` 钉住。
+- 开发工具：pytest（版本由 `uv.lock` 钉住）、ruff、basedpyright（standard 档）。ruff 与 basedpyright 不进项目环境，用开发机上已装的命令；仓库不带 ruff 配置，规则取用户级配置。
 - 不选：PyPI 发布；把状态栏渲染器并入本包；Python 实现的启动器。
 
 ## 模块

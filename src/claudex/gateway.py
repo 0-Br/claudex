@@ -93,7 +93,8 @@ def _read_key_file(path: Path, what: str, hint: str, *, hex64: bool) -> str:
         )
     try:
         # newline="" 保留原样的行尾，CRLF 不被通用换行模式悄悄转成 \n
-        raw = path.read_text(encoding="utf-8", newline="")
+        with path.open(encoding="utf-8", newline="") as stream:
+            raw = stream.read()
     except FileNotFoundError:
         raise GatewayError(f"{what} {path} 不存在；{hint}") from None
     except UnicodeDecodeError:
@@ -395,7 +396,7 @@ def write_gateway_config(content: Mapping[str, object], path: Path) -> bool:
         assert temporary is not None
         _verify_yaml(temporary, content)
         if current is None:
-            os.replace(temporary, path)
+            temporary.replace(path)
             temporary = None
         else:
             _overwrite_in_place(path, data)

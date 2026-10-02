@@ -21,8 +21,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 from typing import TypedDict
 
 from claudex import __version__, catalog, gateway, jsonio, paths
@@ -59,6 +60,7 @@ LATEST_RELEASE_URL = (
 COOLDOWN_SCOPES = ("credential", "model")
 FIVE_HOUR_WINDOW_SECONDS = 18_000
 SEVEN_DAY_WINDOW_SECONDS = 604_800
+PERCENT_MAX = 100  # 已用百分比的上限
 WINDOW_NAME_BY_SECONDS = {
     FIVE_HOUR_WINDOW_SECONDS: "five_hour",
     SEVEN_DAY_WINDOW_SECONDS: "seven_day",
@@ -429,7 +431,7 @@ def _parse_window(value: object, name: str, now: int) -> tuple[str, dict[str, ob
     if (
         isinstance(used, bool)
         or not isinstance(used, (int, float))
-        or not 0 <= used <= 100
+        or not 0 <= used <= PERCENT_MAX
     ):
         raise ValueError(
             f"{name}.used_percent must be numeric in [0, 100], got {used!r}"
@@ -510,7 +512,7 @@ def _parse_reset_at(raw: object) -> int | None:
         return int(raw)
     if isinstance(raw, str) and raw:
         with contextlib.suppress(ValueError):
-            return int(datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp())
+            return int(datetime.fromisoformat(raw).timestamp())
     return None
 
 
@@ -602,9 +604,9 @@ def refresh_codex(
         )
     except RequestError as err:
         raise RefreshError("management_error", str(err)) from err
-    if status == 429:
+    if status == HTTPStatus.TOO_MANY_REQUESTS:
         raise RefreshError("credential_cooldown", "codex usage upstream status 429")
-    if status != 200:
+    if status != HTTPStatus.OK:
         raise RefreshError(
             "upstream_error", f"codex usage expected status 200, got {status}"
         )
@@ -643,8 +645,9 @@ def refresh_antigravity(
                 raise RefreshError("management_error", str(err)) from err
             last_kind, last_error = "upstream_error", str(err)
             continue
-        if not 200 <= status < 300:
-            last_kind = "credential_cooldown" if status == 429 else "upstream_error"
+        if not HTTPStatus.OK <= status < HTTPStatus.MULTIPLE_CHOICES:
+            cooling = status == HTTPStatus.TOO_MANY_REQUESTS
+            last_kind = "credential_cooldown" if cooling else "upstream_error"
             last_error = f"{url} upstream status {status}"
             continue
         try:
@@ -664,7 +667,7 @@ def refresh_openrouter(api_key: str) -> dict[str, object]:
             timeout=QUOTA_TIMEOUT_SECONDS,
         )
     except RequestError as err:
-        if err.status == 429:
+        if err.status == HTTPStatus.TOO_MANY_REQUESTS:
             raise RefreshError("credential_cooldown", str(err)) from err
         kind = "response_invalid" if err.kind == "invalid" else "upstream_error"
         raise RefreshError(kind, str(err)) from err
@@ -809,7 +812,7 @@ def refresh_sources(
 
 
 @contextlib.contextmanager
-def refresh_lock(*, blocking: bool) -> Iterator[bool]:
+def refresh_lock(*, blocking: bool) -> Generator[bool]:
     """持有 `refresh.lock` 的排他锁；产出是否拿到了锁。
 
     `blocking` 为假时锁被占用即产出 False，不等待。`refresh.json` 的一切读改写都

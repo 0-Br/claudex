@@ -68,6 +68,7 @@ RELEASE_BASE_URL = "https://github.com/router-for-me/CLIProxyAPI/releases/downlo
 RELEASES_API_URL = "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases"
 RELEASES_PAGE_SIZE = 100
 MAX_CHANGE_POINTS = 10
+CHECKSUM_LINE_FIELDS = 2  # checksums.txt 每行两个字段：摘要与文件名
 # 配置生成、就地覆写与热加载前提按这个版本的网关源码核实；README 第 3 节同值
 VERIFIED_GATEWAY_VERSION = "7.3.20"
 GATEWAY_BINARY_NAME = "cli-proxy-api"
@@ -119,7 +120,7 @@ def parse_checksum_manifest(manifest: str, filename: str) -> str:
     matches: list[str] = []
     for line in manifest.splitlines():
         parts = line.split()
-        if len(parts) != 2 or parts[1].lstrip("*") != filename:
+        if len(parts) != CHECKSUM_LINE_FIELDS or parts[1].lstrip("*") != filename:
             continue
         digest = parts[0].lower()
         if not SHA256_PATTERN.fullmatch(digest):
@@ -334,7 +335,7 @@ def prepare_release(version: str, install_root: Path) -> Path:
             archive_sha256=expected_archive_sha256,
             binary_sha256=official_binary_sha256,
         )
-        os.replace(extracted, final_directory)
+        extracted.replace(final_directory)
     return final_binary
 
 
@@ -422,7 +423,7 @@ def acquire_lock(path: Path) -> IO[str]:
     """取得非阻塞排他 flock；已有 rollout 在跑时抛 `RolloutError`。"""
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     stream = path.open("a+", encoding="utf-8")
-    os.chmod(path, 0o600)
+    path.chmod(0o600)
     try:
         fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as err:
@@ -443,13 +444,13 @@ def state_path_for(run_id: str) -> Path:
 
 
 def atomic_symlink(target: Path, link: Path) -> None:
-    """用临时 symlink 加 `os.replace()` 原子切换活动二进制。"""
+    """用临时 symlink 加原子改名切换活动二进制。"""
     link.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     temporary = link.with_name(f".{link.name}.{os.getpid()}.new")
     try:
         temporary.unlink(missing_ok=True)
         temporary.symlink_to(target)
-        os.replace(temporary, link)
+        temporary.replace(link)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -517,7 +518,7 @@ def verify_service_identity(
 
 
 def _warn(message: str) -> None:
-    print(f"gateway worker: {message}", file=sys.stderr)
+    sys.stderr.write(f"gateway worker: {message}\n")
 
 
 def _prune_version_directory(candidate: Path, keep: set[Path]) -> None:
@@ -597,7 +598,7 @@ def _roll_back_after_exception(
                 service_executable=executable,
             )
             return
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001  回退途中任何异常都要落到 failed 终态
         # 回退途中再出错也只记类名：异常文本可能带路径以外的内容，不进日志
         _warn(f"rollback after exception failed ({type(err).__name__})")
     update_state(state_path, status="failed", reason=reason)
@@ -685,7 +686,7 @@ def run_worker(
             service_pid=service_pid,
             service_executable=executable,
         )
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001  停旧之后任何异常都要走回退
         # 兜底覆盖一切异常：停旧之后网关不能停在中间态。异常文本可能带路径以外的
         # 内容（如下游命令的输出），日志与 state 只记类名
         reason = f"worker_exception_{type(err).__name__}"
@@ -819,7 +820,7 @@ def _start_rollout(
             str(lock.fileno()),
         ]
         with log_path.open("a", encoding="utf-8") as log_stream:
-            os.chmod(log_path, 0o600)
+            log_path.chmod(0o600)
             detached = subprocess.run(
                 command,
                 check=False,
@@ -1096,7 +1097,7 @@ def _detach_main(args: argparse.Namespace) -> int:
     try:
         os.setsid()
         code = _worker_main(args)
-    except BaseException:
+    except BaseException:  # noqa: BLE001  fork 出的子进程只经 os._exit 退出
         code = EXIT_FAILED
     os._exit(code)
 
@@ -1116,7 +1117,7 @@ def _worker_main(args: argparse.Namespace) -> int:
         update_state(args.state, status="armed", reason="")
         run_worker(args.state)
         return EXIT_HEALTHY
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001  worker 入口：任何异常都换成退出码
         # 布防前或 run_worker 自身出错：state 能写就落 failed，日志只记类名
         with contextlib.suppress(RolloutError):
             update_state(args.state, status="failed", reason=type(err).__name__)
@@ -1146,7 +1147,7 @@ def main(argv: list[str] | None = None) -> int:
             return _detach_main(args)
         return _worker_main(args)
     except (OSError, RolloutError) as err:
-        print(f"claudex.upgrade: {type(err).__name__}", file=sys.stderr)
+        sys.stderr.write(f"claudex.upgrade: {type(err).__name__}\n")
         return 1
 
 

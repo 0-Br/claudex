@@ -212,7 +212,11 @@ def _handler_for(state: _FakeCatalog) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(state.body)
 
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(
+            self,
+            format: str,  # noqa: A002  覆写基类方法，参数名随基类签名
+            *args: object,
+        ) -> None:
             # 不向测试输出写访问日志
             del format, args
 

@@ -171,6 +171,7 @@ class Diagnostic:
             )
 
     def to_json(self) -> dict[str, object]:
+        """`preflight` 输出里一条诊断的 JSON 形态。"""
         return {
             "category": self.category,
             "message": self.message,
@@ -402,14 +403,15 @@ def strip_generated_keys(
             if key.startswith(GENERATED_ENV_PREFIXES) or key in GENERATED_ENV_KEYS:
                 removed.append(f"env.{key}")
                 continue
+            kept_value = value
             if key == CUSTOM_HEADERS_ENV:
                 stripped = _strip_fast_header(value)
                 if stripped != value:
                     removed.append(f"env.{key} 里的 X-Claudex-Tier 头")
                 if stripped is None:
                     continue
-                value = stripped
-            kept[str(key)] = value
+                kept_value = stripped
+            kept[str(key)] = kept_value
         cleaned["env"] = kept
     status_line = base.get("statusLine")
     if status_line is not None:

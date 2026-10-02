@@ -343,10 +343,10 @@ def test_rewrite_keeps_inode_and_mode(tmp_path: Path) -> None:
     target = tmp_path / "out" / "gateway.yaml"
     first = gateway.build_gateway_config(_config(), {}, _secrets())
     gateway.write_gateway_config(first, target)
-    inode = os.stat(target).st_ino
+    inode = target.stat().st_ino
     second = gateway.build_gateway_config(_config(), {"debug": True}, _secrets())
     assert gateway.write_gateway_config(second, target) is True
-    assert os.stat(target).st_ino == inode
+    assert target.stat().st_ino == inode
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
     assert yaml.safe_load(target.read_text(encoding="utf-8")) == second
     assert [entry.name for entry in target.parent.iterdir()] == ["gateway.yaml"]
@@ -356,11 +356,11 @@ def test_unchanged_content_is_not_rewritten(tmp_path: Path) -> None:
     target = tmp_path / "gateway.yaml"
     content = gateway.build_gateway_config(_config(), {}, _secrets())
     gateway.write_gateway_config(content, target)
-    before = os.stat(target)
+    before = target.stat()
     os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns - 10**9))
-    stamped = os.stat(target).st_mtime_ns
+    stamped = target.stat().st_mtime_ns
     assert gateway.write_gateway_config(content, target) is False
-    after = os.stat(target)
+    after = target.stat()
     assert after.st_ino == before.st_ino
     assert after.st_mtime_ns == stamped
 
@@ -529,7 +529,11 @@ def _handler_for(state: _FakeGateway) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(payload)
 
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(
+            self,
+            format: str,  # noqa: A002  覆写基类方法，参数名随基类签名
+            *args: object,
+        ) -> None:
             # 不向测试输出写访问日志
             del format, args
 

@@ -1,4 +1,4 @@
-"""claudex.statusline：JSON 改写与 `claudex` 对象、费用结算、额度、底层渲染器与后台刷新。
+"""claudex.statusline：JSON 改写、`claudex` 对象、费用结算、额度、底层渲染器与后台刷新。
 
 快照与额度缓存在隔离的 state 目录里现场构造；底层渲染器是写在 `tmp_path` 下的 shell
 脚本；后台刷新经 monkeypatch 替换 `claudex.statusline.spawn_refresh`，不真的起子进程。

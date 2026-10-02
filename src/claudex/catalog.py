@@ -95,12 +95,11 @@ def _parse_time(value: object, where: str) -> datetime:
     if not isinstance(value, str):
         raise ValueError(f"{where} 必须是 ISO 8601 UTC 时间字符串，收到 {value!r}")
     try:
-        moment = datetime.strptime(value, FETCHED_AT_FORMAT)
+        return datetime.strptime(value, FETCHED_AT_FORMAT).replace(tzinfo=UTC)
     except ValueError as err:
         raise ValueError(
             f"{where} 必须形如 2026-01-01T00:00:00Z，收到 {value!r}"
         ) from err
-    return moment.replace(tzinfo=UTC)
 
 
 def _positive_int_or_none(value: object, where: str) -> int | None:

@@ -2,10 +2,10 @@
 
 子命令在进程内经 `cli.main` 调用，外网换成本地假服务（`fake_service`）或替身函数。
 启动器以子进程运行源码树的 `bin/claudex`：假 `claude` 放在 PATH 上的临时目录，假网关
-（`fake_gateway`）装在假 HOME 的 `.local/bin/cli-proxy-api`。启动器与生成器把网关地址固定
-为 127.0.0.1:8317，所以启动器用例都在 `unshare` 建的独立用户与网络命名空间里运行，
-假网关监听的是命名空间自己的回环端口，碰不到本机真实网关；系统不允许建用户命名空间时
-这些用例跳过。
+（`fake_gateway`）装在假 HOME 的 `.local/bin/cli-proxy-api`。启动器与生成器把网关地址
+固定为 127.0.0.1:8317，所以启动器用例都在 `unshare` 建的独立用户与网络命名空间里
+运行，假网关监听的是命名空间自己的回环端口，碰不到本机真实网关；系统不允许建用户
+命名空间时这些用例跳过。
 """
 
 import functools
@@ -48,7 +48,7 @@ CURL = shutil.which("curl")
 
 CONFIG_TEXT = """\
 default_profile = "daily"
-mcp_deny = ["mcp__github__*", "mcp__alpha__*"]
+mcp_deny = ["mcp__example__*", "mcp__alpha__*"]
 
 [sources.or]
 type = "openrouter"
@@ -163,7 +163,7 @@ def test_init_creates_private_roots_keys_and_starter_files(
     assert (
         paths.client_key_file().read_text() != paths.management_key_file().read_text()
     )
-    assert '# mcp_deny = ["mcp__github__*"]' in paths.config_file().read_text()
+    assert '# mcp_deny = ["mcp__example__*"]' in paths.config_file().read_text()
     assert 'disable-image-generation: "chat"' in paths.gateway_base_file().read_text()
     json.loads(paths.settings_base_file().read_text(encoding="utf-8"))
     assert "已生成" in capsys.readouterr().out
@@ -242,8 +242,8 @@ def test_completion_bash_parses(capsys: pytest.CaptureFixture[str]) -> None:
 @pytest.mark.parametrize(
     ("words", "expected"),
     [
-        # bash 默认的 COMP_WORDBREAKS 含 @，`@d` 在 COMP_WORDS 里拆成 `@` 与 `d`，而 readline
-        # 替换的是整个 `@d`（交互 shell 实测），候选因此带 @
+        # bash 默认的 COMP_WORDBREAKS 含 @，`@d` 在 COMP_WORDS 里拆成 `@` 与 `d`，
+        # 而 readline 替换的是整个 `@d`（交互 shell 实测），候选因此带 @
         (["claudex", "@", "d"], ["@daily", "@deepseek"]),
         # COMP_WORDBREAKS 里没有 @ 时是一个词
         (["claudex", "@d"], ["@daily", "@deepseek"]),
@@ -286,10 +286,14 @@ def test_profiles_lists_default_and_tiers(capsys: pytest.CaptureFixture[str]) ->
     assert cli.main(["profiles"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines == [
-        "* daily  fable=or/vendor/model-c  opus=or/vendor/model-d  "
-        "sonnet=alpha/model-a  haiku=or/vendor/model-c",
-        "  alt  fable=alpha/model-a  opus=alpha/model-a  "
-        "sonnet=or/vendor/model-c  haiku=or/vendor/model-c",
+        (
+            "* daily  fable=or/vendor/model-c  opus=or/vendor/model-d  "
+            "sonnet=alpha/model-a  haiku=or/vendor/model-c"
+        ),
+        (
+            "  alt  fable=alpha/model-a  opus=alpha/model-a  "
+            "sonnet=or/vendor/model-c  haiku=or/vendor/model-c"
+        ),
     ]
 
 
@@ -633,7 +637,7 @@ def test_gateway_restart_goes_to_managed_restart(
 # login
 
 
-class _Exec(Exception):
+class _ExecError(Exception):
     """替身 execve 抛出它，携带参数。"""
 
     def __init__(self, path: str, argv: list[str], env: dict[str, str]) -> None:
@@ -661,12 +665,12 @@ def test_login_runs_gateway_with_generated_config(
     visited: list[str] = []
 
     def fake_execve(path: str, argv: list[str], env: dict[str, str]) -> None:
-        raise _Exec(path, argv, env)
+        raise _ExecError(path, argv, env)
 
     monkeypatch.setattr(os, "execve", fake_execve)
     monkeypatch.setattr(os, "chdir", lambda target: visited.append(str(target)))
     monkeypatch.setattr(os, "umask", lambda _mask: 0o022)
-    with pytest.raises(_Exec) as raised:
+    with pytest.raises(_ExecError) as raised:
         cli.main(["login", channel])
     config_file = paths.gateway_config_file()
     assert raised.value.argv == [str(binary), "-config", str(config_file), *flags]
@@ -854,7 +858,9 @@ def netns(tmp_path: Path) -> Iterator[Namespace]:
     curl_argv = tmp_path / "curl-argv"
     _write_executable(
         bin_dir / "curl",
-        f'#!/usr/bin/env bash\nprintf \'%s\\n\' "$@" >> {curl_argv}\nexec {CURL} "$@"\n',
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' \"$@\" >> {curl_argv}\n"
+        f'exec {CURL} "$@"\n',
     )
     claude_out = tmp_path / "claude-out"
     claude_out.mkdir()
@@ -918,7 +924,7 @@ def test_launcher_mcp_deny_and_passthrough(netns: Namespace) -> None:
     denied = _launch(netns, "@daily", "-p", "hello")
     assert denied.argv[2:] == [
         "--disallowed-tools",
-        "mcp__github__* mcp__alpha__*",
+        "mcp__example__* mcp__alpha__*",
         "-p",
         "hello",
     ]

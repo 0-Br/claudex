@@ -123,7 +123,11 @@ class _State:
 
 def _handler(state: _State) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(
+            self,
+            format: str,  # noqa: A002  覆写基类方法，参数名随基类签名
+            *args: object,
+        ) -> None:
             del format, args
 
         def _reply(self, status: int, payload: object) -> None:

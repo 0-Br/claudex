@@ -5,7 +5,7 @@
 
 import json
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +40,11 @@ class FakeService:
 
 def _handler_class(service: FakeService) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(
+            self,
+            format: str,  # noqa: A002  覆写基类方法，参数名随基类签名
+            *args: object,
+        ) -> None:
             del format, args
 
         def _handle(self, method: str) -> None:
@@ -75,7 +79,7 @@ def _handler_class(service: FakeService) -> type[BaseHTTPRequestHandler]:
 
 
 @contextmanager
-def running_service() -> Iterator[FakeService]:
+def running_service() -> Generator[FakeService]:
     """运行一个假服务，退出上下文时关闭。"""
     server = ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
     service = FakeService(url=f"http://127.0.0.1:{server.server_address[1]}")

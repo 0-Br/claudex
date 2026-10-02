@@ -38,6 +38,8 @@ QUOTA_FRESH_SECONDS = 120
 QUOTA_STALE_SECONDS = 600
 FIVE_HOUR_SECONDS = 18_000
 SEVEN_DAY_SECONDS = 604_800
+SECONDS_PER_HOUR = 3600
+SECONDS_PER_DAY = 86_400
 WINDOW_NAMES = (("five_hour", "5h"), ("seven_day", "7d"))
 ESTIMATE_MARK = "≈"
 # 费用按标准档单价计，没有乘 Fast 档的倍率
@@ -104,7 +106,7 @@ def _float(value: object) -> float | None:
 
 
 def _warn(message: str) -> None:
-    print(f"claudex statusline: {message}", file=sys.stderr)
+    sys.stderr.write(f"claudex statusline: {message}\n")
 
 
 def _validate_model(ref: str, value: object) -> None:
@@ -203,6 +205,7 @@ def state_path(session_id: str) -> Path:
 
 
 def empty_state() -> dict[str, object]:
+    """一个会话还没有任何记录时的初始 state。"""
     return {
         "v": STATE_VERSION,
         "api_ms": 0,
@@ -396,7 +399,9 @@ def _window(value: object, now: int) -> dict[str, object] | None:
         return None
     used = _float(value.get("used_percentage"))
     resets_at = _int(value.get("resets_at"))
-    if used is None or not 0 <= used <= 100 or resets_at is None or resets_at <= now:
+    if used is None or not 0 <= used <= quota.PERCENT_MAX:
+        return None
+    if resets_at is None or resets_at <= now:
         return None
     return {"used_percentage": used, "resets_at": resets_at}
 
@@ -484,10 +489,12 @@ def fmt_countdown(epoch: int, now: int) -> str:
     remaining = epoch - now
     if remaining <= 0:
         return "reset"
-    if remaining >= 86_400:
-        return f"{remaining // 86_400}d{remaining % 86_400 // 3600}h"
-    if remaining >= 3600:
-        return f"{remaining // 3600}h{remaining % 3600 // 60:02d}m"
+    if remaining >= SECONDS_PER_DAY:
+        days, rest = divmod(remaining, SECONDS_PER_DAY)
+        return f"{days}d{rest // SECONDS_PER_HOUR}h"
+    if remaining >= SECONDS_PER_HOUR:
+        hours, rest = divmod(remaining, SECONDS_PER_HOUR)
+        return f"{hours}h{rest // 60:02d}m"
     return f"{remaining // 60}:{remaining % 60:02d}"
 
 
@@ -497,11 +504,11 @@ def _quota_marker(label: str, model: ModelSnapshot, view: QuotaView, now: int) -
         return f"{label} n/a ({view.reason})"
     suffix = "?" if view.status != "fresh" else ""
     if model["source_type"] == "openrouter":
-        credits = _float(data.get("total_credits"))
+        total_credits = _float(data.get("total_credits"))
         usage = _float(data.get("total_usage"))
-        if credits is None or usage is None:
+        if total_credits is None or usage is None:
             return f"{label} n/a (invalid balance)"
-        return f"{label} ${credits - usage:.2f} left{suffix}"
+        return f"{label} ${total_credits - usage:.2f} left{suffix}"
     windows = rate_limits_for(model, view, now) or {}
     parts = []
     for name, short in WINDOW_NAMES:
@@ -798,7 +805,7 @@ def main() -> int:
     fast = os.environ.get(FAST_ENV) == "1"
     try:
         payload = prepare(source, profile, load_quota(), state, now, fast=fast)
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001  状态栏任何一处出错都不能让整行消失
         # 状态栏每秒运行一次，改写逻辑里没料到的输入不能让整行消失；原因写进 stderr
         _warn(f"prepare: {type(err).__name__}: {err}")
         payload = _sanitize(source)

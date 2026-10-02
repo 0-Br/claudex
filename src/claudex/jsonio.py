@@ -48,7 +48,7 @@ def write_json_atomic(path: Path, obj: object, *, mode: int = 0o600) -> bool:
             stream.flush()
             os.fsync(stream.fileno())
         assert temporary is not None
-        os.replace(temporary, path)
+        temporary.replace(path)
         temporary = None
     finally:
         if temporary is not None:

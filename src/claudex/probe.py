@@ -82,7 +82,9 @@ def read_source_key(name: str) -> str:
     path = paths.source_key_file(name)
     try:
         mode = stat.S_IMODE(path.stat().st_mode)
-        raw = path.read_text(encoding="utf-8", newline="")
+        # newline="" 保留原样的行尾
+        with path.open(encoding="utf-8", newline="") as stream:
+            raw = stream.read()
     except FileNotFoundError:
         raise ProbeError(f"{path} 不存在；运行 claudex key set {name} 写入") from None
     except (OSError, UnicodeDecodeError) as err:
