@@ -79,3 +79,11 @@ claudex 项目决策的 append-only 日志。
 **选择**：本仓库只在维护者的开发机上开发，不接受外部贡献，所以不再自带 ruff 配置，`ruff` 运行时取用户级配置；此前「仓库自带规则集」的做法随之作废。类型检查的设置留在 `pyproject.toml`（standard 档、按 Python 3.12、另开已废弃写法与失效豁免注释两项检查），基线文件删除，整仓以零错误零警告为准。开发依赖里不再钉 ruff 与 basedpyright，两者用开发机上安装的版本。配置模板、README 与测试里的权限规则示例改用中性的 `mcp__example__*`。
 
 **影响**：`pyproject.toml` 的 `[tool.ruff]` 各段与 `.basedpyright/baseline.json` 删除；`gateway.py` 与 `probe.py` 里两处写文件的调用改成 3.12 可用的写法；源码与测试按用户级规则集整理，行为不变；`AGENTS.md` 的检查命令随之更新；版本 0.1.3。
+
+### 2026-10-02: shell 脚本纳入格式标准，声明 0.x 不承诺兼容
+
+**背景**：`bin/` 下的两个 bash 脚本只过静态检查，没有格式标准；README 没有说明版本号的含义。
+
+**选择**：仓库根放 `.editorconfig` 定 shell 的格式（两空格缩进、`case` 分支缩进、二元运算符换行置前），两个脚本按它用 `shfmt` 格式化。版本号在主版本为 0 的阶段不承诺兼容，每次发布升修订号；主版本到 1 才开始承诺，README 的安装一节写明这一点。版本号只在 `src/claudex/__init__.py` 定义，`pyproject.toml` 由构建后端从那里读取。
+
+**影响**：`bin/claudex`、`bin/claudex-client-key` 只有格式变化；`AGENTS.md` 的检查命令加上 `shfmt`；版本 0.1.4。

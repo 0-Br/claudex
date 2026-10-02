@@ -1,0 +1,10 @@
+# shell 脚本的格式标准，shfmt 读本文件。bin/ 下的脚本没有 .sh 后缀，格式化时显式给同样的参数：
+# shfmt -ln bash -i 2 -ci -bn
+root = true
+
+[*.sh]
+indent_style = space
+indent_size = 2
+shell_variant = bash
+binary_next_line = true
+switch_case_indent = true

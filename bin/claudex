@@ -34,11 +34,9 @@ HEALTHCHECK_INTERVAL=0.25
 STOP_ATTEMPTS=20
 STOP_INTERVAL=0.25
 
-
 run_python() {
   "$PYTHON_BIN" -P -m claudex.cli "$@"
 }
-
 
 # PID 文件里的进程是不是本机这份网关：可执行文件与 GATEWAY_BIN 解析到同一处，且命令行带本配置文件
 pid_matches() {
@@ -50,9 +48,8 @@ pid_matches() {
   actual=$(readlink -f -- "/proc/$pid/exe") || return 1
   expected=$(readlink -f -- "$GATEWAY_BIN") || return 1
   [[ $actual == "$expected" ]] || return 1
-  tr '\0' '\n' < "/proc/$pid/cmdline" | grep -Fx -- "$GATEWAY_CONFIG" >/dev/null
+  tr '\0' '\n' <"/proc/$pid/cmdline" | grep -Fx -- "$GATEWAY_CONFIG" >/dev/null
 }
-
 
 # 有监听返回 0、空闲返回 1；ss 本身失败时报错并返回 2，调用方据此拒绝拉起，不当作空闲
 port_in_use() {
@@ -65,15 +62,13 @@ port_in_use() {
   [[ -n $listeners ]]
 }
 
-
 recorded_pid() {
   local pid=
   if [[ -r $PID_FILE ]]; then
-    IFS= read -r pid < "$PID_FILE" || pid=
+    IFS= read -r pid <"$PID_FILE" || pid=
   fi
   printf '%s' "$pid"
 }
-
 
 # 不健康时把原因写进 HEALTHCHECK_ERROR、不写终端：启动轮询期间的连接失败是常态，
 # 由调用方在最终判定不健康时报出最后一次的原因
@@ -82,20 +77,19 @@ healthcheck() {
 
   HEALTHCHECK_ERROR="client key $CLIENT_KEY_FILE is missing or empty"
   [[ -r $CLIENT_KEY_FILE ]] || return 1
-  IFS= read -r key < "$CLIENT_KEY_FILE" || [[ -n $key ]] || return 1
+  IFS= read -r key <"$CLIENT_KEY_FILE" || [[ -n $key ]] || return 1
   [[ -n $key ]] || return 1
   # 请求头经 curl 的 stdin 配置传入：命令参数在 /proc/<pid>/cmdline 与 ps 里对同机任意进程可见，
   # 放进 --header 等于把 client key 摊在进程列表上。本机网关不走环境变量里的代理
   if HEALTHCHECK_ERROR=$(
-    printf 'header = "Authorization: Bearer %s"\n' "$key" |
-      curl --config - --silent --show-error --fail --max-time 2 --noproxy '*' \
+    printf 'header = "Authorization: Bearer %s"\n' "$key" \
+      | curl --config - --silent --show-error --fail --max-time 2 --noproxy '*' \
         "http://127.0.0.1:$GATEWAY_PORT/v1/models" 2>&1 >/dev/null
   ); then
     return 0
   fi
   return 1
 }
-
 
 # 已在跑且健康返回 0；没在跑就拉起并等到健康。不健康或拉不起来时非零退出（受管升级的 worker 依赖这一点）。
 ensure_gateway() (
@@ -106,10 +100,10 @@ ensure_gateway() (
   mkdir -p "$STATE_DIR"
   # state 根放着含全部 key 的 gateway.yaml；已存在的旧目录也在这里收紧
   chmod 0700 "$STATE_DIR"
-  : >> "$BOOT_LOG"
-  : >> "$START_LOCK"
+  : >>"$BOOT_LOG"
+  : >>"$START_LOCK"
   chmod 0600 "$BOOT_LOG" "$START_LOCK"
-  exec 9> "$START_LOCK"
+  exec 9>"$START_LOCK"
   flock 9
 
   pid=$(recorded_pid)
@@ -138,8 +132,8 @@ ensure_gateway() (
   (
     cd "$STATE_DIR"
     WRITABLE_PATH=$STATE_DIR nohup "$GATEWAY_BIN" -config "$GATEWAY_CONFIG" \
-      >> "$BOOT_LOG" 2>&1 9>&- &
-    printf '%s\n' "$!" > "$PID_FILE.new"
+      >>"$BOOT_LOG" 2>&1 9>&- &
+    printf '%s\n' "$!" >"$PID_FILE.new"
     chmod 0600 "$PID_FILE.new"
     mv "$PID_FILE.new" "$PID_FILE"
   )
@@ -161,11 +155,9 @@ ensure_gateway() (
   return 1
 )
 
-
 gateway_running() {
   pid_matches "$(recorded_pid)"
 }
-
 
 stop_gateway() {
   local attempt pid
@@ -200,7 +192,6 @@ stop_gateway() {
   return 1
 }
 
-
 # 生成 gateway.yaml → 确保网关在跑 → 配置有改写且网关原本就在跑时等模型注册
 prepare_gateway() {
   local change was_running=0
@@ -214,7 +205,6 @@ prepare_gateway() {
     run_python _wait-models || return 1
   fi
 }
-
 
 # 从继承的环境里去掉会话状态与别的认证：Fast 请求头、CLAUDEX_FAST、状态栏底层渲染器与 compact
 # 窗口由派生 settings 的 env 给出，从 claudex 会话里再起的会话不得沿用；会话只经 apiKeyHelper
@@ -232,14 +222,13 @@ clear_inherited_session_env() {
     probe=${line#"${line%%[![:space:]]*}"}
     [[ ${probe,,} == 'x-claudex-tier:'* || -z $line ]] && continue
     kept+=${kept:+$'\n'}$line
-  done <<< "$headers"
+  done <<<"$headers"
   if [[ -n $kept ]]; then
     export ANTHROPIC_CUSTOM_HEADERS=$kept
   else
     unset ANTHROPIC_CUSTOM_HEADERS
   fi
 }
-
 
 launch_session() {
   local profile=$1 with_mcp=$2 fast=$3
@@ -274,7 +263,7 @@ launch_session() {
       mcp_deny=*) deny+=("${line#mcp_deny=}") ;;
       notice=*) notice=${line#notice=} ;;
     esac
-  done <<< "$output"
+  done <<<"$output"
   if [[ -z $settings || ! -r $settings ]]; then
     printf 'claudex: rendering produced no settings file\n' >&2
     return 1
@@ -287,7 +276,6 @@ launch_session() {
   fi
   exec "$claude_bin" --settings "$settings" --disallowed-tools "${deny[*]}" "$@"
 }
-
 
 usage() {
   cat <<'EOF'
@@ -304,13 +292,12 @@ See README.md for configuration and details.
 EOF
 }
 
-
 main() {
   local profile='' with_mcp=0 fast=0
   local tier_args=()
 
   case ${1:-} in
-    -h|--help|help)
+    -h | --help | help)
       usage
       return 0
       ;;
@@ -326,12 +313,18 @@ main() {
       shift
       case ${1:-} in
         start)
-          (($# == 1)) || { printf 'claudex: gateway start accepts no arguments\n' >&2; return 2; }
+          (($# == 1)) || {
+            printf 'claudex: gateway start accepts no arguments\n' >&2
+            return 2
+          }
           prepare_gateway
           return
           ;;
         stop)
-          (($# == 1)) || { printf 'claudex: gateway stop accepts no arguments\n' >&2; return 2; }
+          (($# == 1)) || {
+            printf 'claudex: gateway stop accepts no arguments\n' >&2
+            return 2
+          }
           stop_gateway
           return
           ;;
@@ -361,7 +354,7 @@ main() {
       fi
       exec "$PYTHON_BIN" -P -m claudex.cli probe "$@"
       ;;
-    init|key|login|profiles|status|preflight|update|completion|_*)
+    init | key | login | profiles | status | preflight | update | completion | _*)
       exec "$PYTHON_BIN" -P -m claudex.cli "$@"
       ;;
   esac
@@ -370,7 +363,10 @@ main() {
   while (($# > 0)); do
     case $1 in
       --profile)
-        [[ $# -ge 2 ]] || { printf 'claudex: --profile needs a name\n' >&2; return 2; }
+        [[ $# -ge 2 ]] || {
+          printf 'claudex: --profile needs a name\n' >&2
+          return 2
+        }
         profile=$2
         shift 2
         ;;
@@ -378,8 +374,11 @@ main() {
         profile=${1#--profile=}
         shift
         ;;
-      --fable|--opus|--sonnet|--haiku)
-        [[ $# -ge 2 ]] || { printf 'claudex: %s needs a model reference\n' "$1" >&2; return 2; }
+      --fable | --opus | --sonnet | --haiku)
+        [[ $# -ge 2 ]] || {
+          printf 'claudex: %s needs a model reference\n' "$1" >&2
+          return 2
+        }
         tier_args+=("$1" "$2")
         shift 2
         ;;
@@ -402,7 +401,6 @@ main() {
   done
   launch_session "$profile" "$with_mcp" "$fast" "${tier_args[@]}" -- "$@"
 }
-
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
   if [[ -z $PYTHON_BIN ]]; then

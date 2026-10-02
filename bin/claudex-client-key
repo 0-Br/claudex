@@ -17,7 +17,7 @@ fi
 
 key=
 # 末行没有换行时 read 读到内容但返回非零；读空由下面的格式检查报出
-IFS= read -r key < "$key_file" || true
+IFS= read -r key <"$key_file" || true
 if [[ ! $key =~ ^[0-9a-f]{64}$ ]]; then
   printf 'claudex: client key must be 64 lowercase hex characters: %s\n' "$key_file" >&2
   exit 1
