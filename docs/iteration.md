@@ -14,6 +14,7 @@ claudex 当前状态的快照与展望。
 | 问题 | 影响 | 优先级 |
 | --- | --- | --- |
 | OpenAI 兼容段（`openrouter`、`openai` 类来源）无法让网关剥掉档位，无档位模型仍会收到 low、medium、high | 不接受 `reasoning_effort` 的上游可能拒收请求；可用 `claudex probe` 发现，README 第 5.3 节已说明 | 低 |
+| 起步文件 `templates/claudex.toml`（与 `examples/claudex.toml`）的首行注释写「claudex 的唯一配置文件」，而使用者要维护的配置有三份，另两份是 `gateway.base.yaml` 与 `settings.base.json` | 与 README 第 5 节把三份都列为使用者维护的说法不一致，读者可能以为另两份不用管；不影响功能。改成「来源、模型与 profile 的唯一真相源」这类说法即可，改后已有的用户配置要各自同步这一行 | 低 |
 
 ## 路线图
 
