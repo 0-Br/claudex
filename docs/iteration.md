@@ -15,6 +15,8 @@ claudex 当前状态的快照与展望。
 | --- | --- | --- |
 | OpenAI 兼容段（`openrouter`、`openai` 类来源）无法让网关剥掉档位，无档位模型仍会收到 low、medium、high | 不接受 `reasoning_effort` 的上游可能拒收请求；可用 `claudex probe` 发现，README 第 5.3 节已说明 | 低 |
 | 起步文件 `templates/claudex.toml`（与 `examples/claudex.toml`）的首行注释写「claudex 的唯一配置文件」，而使用者要维护的配置有三份，另两份是 `gateway.base.yaml` 与 `settings.base.json` | 与 README 第 5 节把三份都列为使用者维护的说法不一致，读者可能以为另两份不用管；不影响功能。改成「来源、模型与 profile 的唯一真相源」这类说法即可，改后已有的用户配置要各自同步这一行 | 低 |
+| `cli.py` 的分区注释与 `catalog.py` 一个函数的 docstring 写「按 spec 的次序」「按 spec 的取值顺序」，仓库里没有这份文档 | 读者找不到这句话指的规定；不影响功能。改成直接写出所遵守的次序，或指向 `docs/architecture.md` 的启动次序与 README 的对应小节 | 低 |
+| 根指引 `AGENTS.md` 的第三行要求开工前先读项目规则目录下的全部文件，仓库里没有这个目录 | 照着做的读者会去找一个不存在的目录；不影响功能。删掉这一句即可 | 低 |
 
 ## 路线图
 
