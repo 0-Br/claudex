@@ -36,7 +36,7 @@ claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv too
 安装 claudex：
 
 ```bash
-uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.4"
+uv tool install --managed-python --python 3.14 "claudex @ git+https://github.com/0-Br/claudex@v0.1.5"
 ```
 
 版本号处在 0.x 阶段：配置格式、命令与文件布局可能在任何一次发布里改变，不承诺向后兼容，升级前先看本文件对应版本的说明。
