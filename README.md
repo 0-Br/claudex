@@ -6,8 +6,8 @@ claudex launches Claude Code with a dedicated settings file and routes its model
 
 claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv tool。每次运行 `claudex` 启动会话时，按固定次序做四件事：
 
-1. 以你写的 `gateway.base.yaml` 为底稿，按 `claudex.toml` 生成网关配置 `gateway.yaml`，其中含全部来源段与 key；
-2. 确保 CLIProxyAPI 网关在 `127.0.0.1:8317` 上运行，没在跑就拉起它；这次改写了配置而网关原本就在跑时，等网关加载完新模型；
+1. 以您写的 `gateway.base.yaml` 为底稿，按 `claudex.toml` 生成网关配置 `gateway.yaml`，其中含全部来源段与 key；
+2. 确保 CLIProxyAPI 网关在 `127.0.0.1:8317` 上运行，没在跑就拉起它（[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 是一个开源的模型 API 代理程序）；这次改写了配置而网关原本就在跑时，等网关加载完新模型；
 3. 生成一份不可变的会话快照：Claude Code 的派生 settings，以及状态栏读的模型表；
 4. 以这份派生 settings 启动 `claude`。
 
@@ -22,7 +22,7 @@ claudex 由一个 bash 启动器和一个 Python 包组成，装成一个 uv too
 | 通用接口 | `openai` | OpenAI 兼容段，地址自填 | 无 |
 | 通用接口 | `anthropic` | Anthropic 兼容段，地址自填 | 无 |
 
-每个来源只列你要用的模型。没列的模型不写进网关配置，也不出现在 Claude Code 的模型选择里。
+每个来源只列您要用的模型。没列的模型不写进网关配置，也不出现在 Claude Code 的模型选择里。
 
 ## 2. 前置条件
 
@@ -82,9 +82,9 @@ claudex                # 用 default_profile 启动会话
 
 | 文件 | 谁写 | 内容 |
 | --- | --- | --- |
-| `claudex.toml` | 你 | 来源、模型、profile 与全局选项，唯一的真相源 |
-| `gateway.base.yaml` | 你 | 网关的非来源配置，如 `proxy-url`、`routing`、`disable-image-generation`、`payload` 规则；不含任何 key 与来源段 |
-| `settings.base.json` | 你 | 派生 Claude Code settings 的基底，透传规则见 5.4 |
+| `claudex.toml` | 您 | 来源、模型、profile 与全局选项，唯一的真相源 |
+| `gateway.base.yaml` | 您 | 网关的非来源配置，如 `proxy-url`、`routing`、`disable-image-generation`、`payload` 规则；不含任何 key 与来源段 |
+| `settings.base.json` | 您 | 派生 Claude Code settings 的基底，透传规则见 5.4 |
 | `client.key`、`management.key` | `claudex init` | 下游 key 与管理密码，0600 |
 | `keys/<来源名>.key` | `claudex key set` | 通用来源的上游 API key，0600 |
 
@@ -321,7 +321,7 @@ OAuth 目录、网关二进制与版本目录的位置固定，不受覆盖变�
 - **目录缓存损坏**：`claudex update`。
 - **`claudex upgrade` 报网关未运行**：先 `claudex gateway start`。报二进制不存在：按第 3 节首装。
 - **状态栏退成一行简版**：stderr 里写着底层渲染器失败的原因。
-- **`gateway stop` 报 `stale gateway PID file`**：PID 文件记的进程已经不是网关（网关已退出），claudex 不替你删它。直接 `claudex gateway start` 会覆盖这份记录；只想清掉就删 `~/.local/state/claudex/gateway.pid`。
+- **`gateway stop` 报 `stale gateway PID file`**：PID 文件记的进程已经不是网关（网关已退出），claudex 不替您删它。直接 `claudex gateway start` 会覆盖这份记录；只想清掉就删 `~/.local/state/claudex/gateway.pid`。
 
 ## 13. 安全与备份
 
@@ -339,11 +339,15 @@ uv sync --locked --group dev --python 3.14
 uv run --locked pytest
 ruff check . && ruff format --check .
 basedpyright --pythonpath .venv/bin/python
-shellcheck -x bin/claudex bin/claudex-client-key
+shellcheck -x bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash
 ```
 
-ruff 与 basedpyright 不在项目环境里，用开发机上已装的命令；仓库不带 ruff 配置，规则取 ruff 的用户级配置。类型检查的门槛是零诊断。源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
+ruff 与 basedpyright 不在项目环境里，需要另行安装。仓库不带 ruff 的规则配置，维护者用自己的全局配置检查，所以在别的环境里运行 `ruff check .` 的结果可能不同。类型检查的门槛是零诊断。源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
 
-## 15. 许可证
+## 15. 反馈与贡献
+
+问题与建议请在 GitHub 的 [issue](https://github.com/0-Br/claudex/issues) 里提出。claudex 目前不接受外部的代码贡献。
+
+## 16. 许可证
 
 MIT，见 `LICENSE`。

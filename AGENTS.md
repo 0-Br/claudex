@@ -2,49 +2,49 @@
 
 开始任何工作前，先列出并逐字读取 `.claude/rules/` 下全部 `.md` 文件（Claude Code 已自动加载该目录，无需重复读取）。
 
-claudex 以专用 settings 启动 Claude Code，把模型请求经本机 CLIProxyAPI 网关转到所选后端；它由 bash 启动器 `bin/claudex` 与 Python 包 `claudex` 组成，是 uv 项目，Python 3.14。本文件只记在本仓库工作需要的信息；README 面向使用者，写安装、配置与对外接口，本文件面向在本仓库做开发的 agent，两者不互相复述。默认模式：开发模式。
+claudex 以专用 settings 启动 Claude Code，把模型请求经本机 CLIProxyAPI 网关转到所选后端；它由 bash 启动器 `bin/claudex` 与 Python 包 `claudex` 组成，是 uv 项目，Python 3.14。本文件只记在本仓库工作需要的信息；README 面向使用者，写安装、配置与对外接口，本文件面向在本仓库做开发的 agent，两者不互相复述。
 
-## 首次阅读
+## 开始之前先读
 
 开始工作前按顺序逐字读：
 
 1. `docs/architecture.md`：模块分工、启动次序、数据落点与技术栈。
 2. `docs/iteration.md`：当前状态、已知问题与路线图。
-3. `README.md` 第 5 节到第 11 节：配置、状态栏对象、计价、命令、`status` 与 `preflight` 的输出格式、持久落点与覆盖变量，这是本包的对外接口，改动前必须知道现状。
+3. `README.md` 第 5 节到第 11 节：配置、状态栏对象、计价、命令、`status` 与 `preflight` 的输出格式、持久落点与覆盖变量，这是 claudex 的对外接口，改动前必须知道现状。
 
 `docs/decisions.md` 是决策日志，不通读，按关键词检索后读命中的条目。
 
-## 受管接口
+## 只能用指定命令修改的内容
 
-| 受管状态 | 唯一写入通道 |
+| 内容 | 唯一的修改办法 |
 | --- | --- |
 | 项目环境 `.venv/` 与锁文件 `uv.lock` | uv 命令；运行与测试一律带 `--locked`，加减依赖与改锁（`uv add`、`uv remove`、`uv lock`）由维护者执行 |
 | `init` 的起步文件 | 正本在 `src/claudex/templates/`；`examples/` 下的同名文件与之逐字相同，由测试断言，改一处同步另一处 |
 | 用户配置 `~/.config/claudex/` 与 state `~/.local/state/claudex/` | 只经 claudex 自身的命令写（`init`、`key set`、启动与刷新程序）；代码与测试在测试里一律经 `CLAUDEX_CONFIG_DIR`、`CLAUDEX_STATE_DIR` 指到临时目录 |
 
-本表是完整枚举，新增受管状态在此加一行。
+表里列出了全部这类内容，新增时在这里加一行。
 
-## 开发与验证
+## 开发与验证的办法
 
 改动与验证本项目时用到的命令与约定：
 
 | 项 | 取值 |
 | --- | --- |
-| 测试命令 | 全量：`uv run --locked pytest`；收集：`uv run --locked pytest --collect-only -q`。首次运行前 `uv sync --locked --group dev --python 3.14` |
-| CLI 前缀 | 源码树的 `bin/claudex`（项目环境同步之后；启动器用 `.venv/bin/python`）；只调 Python 子命令时也可用 `uv run --locked python -P -m claudex.cli` |
-| 必读文档清单 | 见首次阅读 |
-| 变更同步矩阵（改了什么就要同步什么） | 见下方“变更同步矩阵”一节 |
-| 记账载体（决策与状态记在哪里） | 决策日志 `docs/decisions.md`；状态快照、已知问题与路线图 `docs/iteration.md` |
-| 批次验证映射（改了哪些文件就跑哪些测试） | `src/claudex/<模块>.py` → `tests/test_<模块>.py`；`paths.py`、`jsonio.py`、`config.py`、`pyproject.toml`、`tests/conftest.py`、`tests/fake_gateway.py`、`tests/fake_service.py`、`bin/claudex` 是共享底座，改了就跑全量。类型检查不收窄，每批都对整个项目跑 |
-| lint 与 format 命令与政策 | `ruff check .` 与 `ruff format --check .`，零违规；`shellcheck -x bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash` 零告警，`shfmt -d -ln bash -i 2 -ci -bn bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash` 无差异（格式标准见仓库根的 `.editorconfig`；格式化之后要跑一遍测试）。用 PATH 上的 ruff，它不在项目环境里；仓库不带 ruff 配置，规则取用户级配置 |
-| 机械核查命令（lint 之外的检查） | `basedpyright --pythonpath .venv/bin/python`，standard 档，零 error、零 warning。用 PATH 上的 basedpyright，配置在 `pyproject.toml` 的 `[tool.basedpyright]`，`--pythonpath` 让它按项目环境解析第三方导入 |
-| 严重度本域举例（三级严重度在本项目里长什么样） | critical：key 进了 argv、日志、错误信息、快照或状态文件，`gateway.yaml` 或 key 文件权限不是 0600，写入 `gateway.yaml` 换掉了 inode 使网关热加载失效，状态栏费用重复计或漏计，受管升级失败后没有回退。warning：`status`、`preflight` 的输出格式与 README 第 10 节不一致，`claudex` 对象字段与 README 第 8 节不一致，测试依赖真实网关、真实 HOME 或网络，错误只报不报位置。info：提示措辞，帮助文本，文档排版 |
+| 怎样运行测试 | 全量：`uv run --locked pytest`；收集：`uv run --locked pytest --collect-only -q`。首次运行前 `uv sync --locked --group dev --python 3.14` |
+| 怎样调用项目的命令 | 源码树的 `bin/claudex`（项目环境同步之后；启动器用 `.venv/bin/python`）；只调 Python 子命令时也可用 `uv run --locked python -P -m claudex.cli` |
+| 开始之前要读的文档 | 见开始之前先读 |
+| 改了什么要同步改什么 | 见下方“改了什么要同步改什么”一节 |
+| 决策与状态记在哪里 | 决策日志 `docs/decisions.md`；状态快照、已知问题与路线图 `docs/iteration.md` |
+| 改了哪些目录就运行哪些测试 | `src/claudex/<模块>.py` → `tests/test_<模块>.py`；`paths.py`、`jsonio.py`、`config.py`、`pyproject.toml`、`tests/conftest.py`、`tests/fake_gateway.py`、`tests/fake_service.py`、`bin/claudex` 是共享的基础，改了就运行全量。类型检查每次都对整个项目运行 |
+| 怎样检查与格式化代码 | `ruff check .` 与 `ruff format --check .`，零违规；`shellcheck -x bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash` 零告警，`shfmt -d -ln bash -i 2 -ci -bn bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash` 无差异（格式标准见仓库根的 `.editorconfig`；格式化之后要跑一遍测试）。ruff 不在项目环境里，用 PATH 上的命令；仓库不带 ruff 的规则配置，维护者用自己的全局配置检查 |
+| 有哪些核查的命令 | `basedpyright --pythonpath .venv/bin/python`，standard 档，零 error、零 warning。用 PATH 上的 basedpyright，配置在 `pyproject.toml` 的 `[tool.basedpyright]`，`--pythonpath` 让它按项目环境解析第三方导入 |
+| 哪些问题算严重 | critical：key 进了 argv、日志、错误信息、快照或状态文件，`gateway.yaml` 或 key 文件权限不是 0600，写入 `gateway.yaml` 换掉了 inode 使网关热加载失效，状态栏费用重复计或漏计，受管升级失败后没有回退。warning：`status`、`preflight` 的输出格式与 README 第 10 节不一致，`claudex` 对象字段与 README 第 8 节不一致，测试依赖真实网关、真实 HOME 或网络，错误只报不报位置。info：提示措辞，帮助文本，文档排版 |
 
-## 变更同步矩阵
+## 改了什么要同步改什么
 
-本表是完整枚举。
+下表列出了全部需要同步的情形。
 
-| 变更 | 必须同步 |
+| 改动 | 必须同步 |
 | --- | --- |
 | `claudex.toml` 的字段或校验规则 | `config.py`、`src/claudex/templates/claudex.toml` 与 `examples/claudex.toml`、README 第 5 节、`tests/test_config.py` |
 | 网关配置的生成规则、禁止键或写入方式 | `gateway.py`、`templates/gateway.base.yaml` 与 `examples/`、README 第 5.1 节与第 10.3 节、`docs/architecture.md` 的启动次序、`tests/test_gateway.py` |
