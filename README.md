@@ -342,7 +342,7 @@ basedpyright --pythonpath .venv/bin/python
 shellcheck -x bin/claudex bin/claudex-client-key src/claudex/templates/completion.bash
 ```
 
-ruff 与 basedpyright 不在项目环境里，需要另行安装。仓库不带 ruff 的规则配置，维护者用自己的全局配置检查，所以在别的环境里运行 `ruff check .` 的结果可能不同。类型检查的门槛是零诊断。源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
+ruff（Python 的 lint 与格式化工具）与 basedpyright（Python 的类型检查器）不在项目环境里，需要另行安装。仓库不带 ruff 的规则配置，维护者用自己的全局配置检查，所以在别的环境里运行 `ruff check .` 的结果可能不同。类型检查的门槛是零诊断。源码树里的 `bin/claudex` 可以直接运行，它使用项目环境 `.venv` 的解释器。启动器测试在 `unshare` 建的独立用户与网络命名空间里运行，系统不允许非特权用户命名空间时，这些测试会被跳过，所以看测试结果时要核对跳过数为零。
 
 ## 15. 反馈与贡献
 
