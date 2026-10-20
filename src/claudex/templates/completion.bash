@@ -2,11 +2,11 @@
 _claudex() {
   local cur prev
   cur=${COMP_WORDS[COMP_CWORD]}
-  prev=${COMP_WORDS[COMP_CWORD-1]:-}
+  prev=${COMP_WORDS[COMP_CWORD - 1]:-}
   local commands="init key probe login profiles status preflight update upgrade gateway completion"
   local options="--profile --fable --opus --sonnet --haiku --with-mcp --fast"
   case "$prev" in
-    --fable|--opus|--sonnet|--haiku)
+    --fable | --opus | --sonnet | --haiku)
       mapfile -t COMPREPLY < <(compgen -W "$(claudex _complete refs 2>/dev/null)" -- "$cur")
       return 0
       ;;
