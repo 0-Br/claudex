@@ -72,7 +72,7 @@ CHECKSUM_LINE_FIELDS = 2  # checksums.txt 每行两个字段：摘要与文件�
 # 配置生成、就地覆写与热加载前提按这个版本的网关源码核实；README 第 3 节同值
 VERIFIED_GATEWAY_VERSION = "7.3.20"
 GATEWAY_BINARY_NAME = "cli-proxy-api"
-INSTALL_HINT = "网关二进制不在 {link}；首次安装方法见 README 的「安装」一节"
+INSTALL_HINT = "网关二进制不在 {link}；首次安装方法见 README 的“安装”一节"
 NOT_RUNNING_HINT = (
     "网关没有在运行或身份核对失败（{reason}）；先运行 claudex gateway start"
 )

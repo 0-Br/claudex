@@ -172,7 +172,7 @@ claudex probe plan model-f    # 经网关探测已列出的模型
 - `key set` 只接受 `claudex.toml` 里已有的通用来源。
 - 先给配置里的每个通用来源录好 key，再登录订阅：`login` 要先生成网关配置，缺任何一个 key 文件都会报错，并提示对应的 `claudex key set` 命令。
 - `probe` 不带模型 id 时，列出上游的模型：`openai`、`openrouter` 取 `GET <base_url>/models`，`anthropic` 取 `GET <base_url>/v1/models`，上游不提供这个接口时报错说明；订阅来源列出网关模型定义里的模型。
-- 带模型 id 时，这些模型须已写进该来源的 `models`（缺 context 可以），probe 经网关对每个模型发几个极小请求，检验四项：能否应答、工具调用、各档位是否被接受、图片输入。最后打印结果与建议写进配置的 `context`、`efforts`。「档位被接受」只说明上游没有报错，不等于档位真的生效。
+- 带模型 id 时，这些模型须已写进该来源的 `models`（缺 context 可以），probe 经网关对每个模型发几个极小请求，检验四项：能否应答、工具调用、各档位是否被接受、图片输入。最后打印结果与建议写进配置的 `context`、`efforts`。“档位被接受”只说明上游没有报错，不等于档位真的生效。
 - 订阅来源不做能力探测。
 
 ## 7. 启动会话
@@ -229,7 +229,7 @@ claudex @daily -p "hello"        # 其余参数原样交给 claude
 - OpenRouter 目录只有一份缓存，后台每 24 小时刷新一次；`claudex update` 强制刷新，缓存损坏时也用它修复。
 - 状态栏只结算主对话的每次响应：subagent 与后台调用的用量不计入，显示的费用是会话花费的下限。
 - 额度只有三种：Codex 与 Antigravity 的额度窗口与冷却，经网关管理接口取得；`openrouter` 类来源的账户余额，取 `GET /api/v1/credits` 的 `total_credits − total_usage`。某个来源失败时保留上一次成功的数据。
-- 平时没有「过期」类提醒。只有真问题才报：profile 引用的模型不在网关里、订阅模型不在网关定义里、slug 不在目录里、配置错误。
+- 平时没有“过期”类提醒。只有真问题才报：profile 引用的模型不在网关里、订阅模型不在网关定义里、slug 不在目录里、配置错误。
 
 ## 10. 命令
 
