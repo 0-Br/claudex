@@ -1,7 +1,5 @@
 # claudex
 
-开始任何工作前，先列出并逐字读取 `.claude/rules/` 下全部 `.md` 文件（Claude Code 已自动加载该目录，无需重复读取）。
-
 claudex 以专用 settings 启动 Claude Code，把模型请求经本机 CLIProxyAPI 网关转到所选后端；它由 bash 启动器 `bin/claudex` 与 Python 包 `claudex` 组成，是 uv 项目，Python 3.14。本文件只记在本仓库工作需要的信息；README 面向使用者，写安装、配置与对外接口，本文件面向在本仓库做开发的 agent，两者不互相复述。
 
 ## 开始之前先读
