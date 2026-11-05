@@ -39,3 +39,8 @@ id_ed25519*
 .credentials.json
 auth.json
 credentials.json
+
+# 仓库根下的工作目录（临时文件、输入数据、生成的产物），整体忽略
+/temp/
+/data/
+/outputs/
